@@ -1,2 +1,2 @@
 # Airbnb-prototype
-Airbnb prototype - React frontend + Node/Express backend _ FastAPI agent.
+Airbnb prototype - React frontend + Node/Express backend + FastAPI agent.
