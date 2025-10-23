@@ -24,6 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 // ---- CORS ----
 const allowed = [
   process.env.CORS_ORIGIN || 'http://localhost:5173',
+  'http://localhost:3000',
   `http://localhost:${process.env.PORT || 8000}`
 ];
 app.use(cors({
