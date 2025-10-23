@@ -1,0 +1,33 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Owner API", "version": "1.0.0" },
+  "servers": [{ "url": "http://localhost:8001" }],
+  "components": {
+    "securitySchemes": { "cookieAuth": { "type": "apiKey", "in": "cookie", "name": "sid" } }
+  },
+  "paths": {
+    "/api/health": { "get": { "summary": "Health", "responses": { "200": { "description": "OK" } } } },
+    "/api/auth/signup": { "post": { "summary": "Owner signup", "responses": { "201": { "description": "Created" }, "409": { "description": "Email in use" } } } },
+    "/api/auth/login": { "post": { "summary": "Login", "responses": { "200": { "description": "OK" }, "401": { "description": "Invalid" } } } },
+    "/api/auth/logout": { "post": { "summary": "Logout", "responses": { "204": { "description": "No Content" } } } },
+    "/api/users/me": {
+      "get": { "security": [{ "cookieAuth": [] }], "summary": "Get profile", "responses": { "200": { "description": "OK" }, "401": { "description": "Unauthorized" } } },
+      "put": { "security": [{ "cookieAuth": [] }], "summary": "Update profile", "responses": { "200": { "description": "OK" }, "400": { "description": "Validation" } } }
+    },
+    "/api/properties": {
+      "get": { "security": [{ "cookieAuth": [] }], "summary": "List my properties", "responses": { "200": { "description": "OK" } } },
+      "post": { "security": [{ "cookieAuth": [] }], "summary": "Create property", "responses": { "201": { "description": "Created" }, "400": { "description": "Validation" } } }
+    },
+    "/api/properties/{id}": {
+      "get":   { "security": [{ "cookieAuth": [] }], "summary": "Get property", "responses": { "200": { "description": "OK" }, "404": { "description": "Not found" } } },
+      "put":   { "security": [{ "cookieAuth": [] }], "summary": "Update property", "responses": { "200": { "description": "OK" }, "400": { "description": "Validation" } } }
+    },
+    "/api/properties/{id}/photos": {
+      "post": { "security": [{ "cookieAuth": [] }], "summary": "Upload photo", "responses": { "200": { "description": "OK" }, "400": { "description": "No file" } } }
+    },
+    "/api/bookings/incoming": { "get": { "security": [{ "cookieAuth": [] }], "summary": "Incoming bookings", "responses": { "200": { "description": "OK" } } } },
+    "/api/bookings/{id}/accept": { "post": { "security": [{ "cookieAuth": [] }], "summary": "Accept booking", "responses": { "200": { "description": "OK" }, "404": { "description": "Not found" } } } },
+    "/api/bookings/{id}/cancel": { "post": { "security": [{ "cookieAuth": [] }], "summary": "Cancel booking", "responses": { "200": { "description": "OK" }, "404": { "description": "Not found" } } } },
+    "/api/dashboard": { "get": { "security": [{ "cookieAuth": [] }], "summary": "Owner dashboard", "responses": { "200": { "description": "OK" } } } }
+  }
+}
