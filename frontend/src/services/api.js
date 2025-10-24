@@ -24,10 +24,33 @@ export const travelerApi = {
   logout: ()      => request(TRAVELER_API, "/api/auth/logout", { method: "POST" }),
 
   me:     ()      => request(TRAVELER_API, "/api/users/me"),
+  
+  updateMe: (body) => request(TRAVELER_API, "/api/users/me", { method: "PUT", body: JSON.stringify(body) }),
+  
+  uploadAvatar: async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${TRAVELER_API}/api/users/me/avatar`, {
+      method: "POST",
+      body: form,
+      credentials: "include",
+    });
+    const ct = res.headers.get("content-type") || "";
+    const isJSON = ct.includes("application/json");
+    const data = isJSON ? await res.json().catch(() => null) : await res.text().catch(() => "");
+    if (!res.ok) {
+      const msg = (isJSON && data && (data.error || data.message)) || res.statusText || "Upload failed";
+      throw new Error(msg);
+    }
+    return data;
+  },
+
+  
   listings: (params={}) => {
     const qs = new URLSearchParams(params).toString();
     return request(TRAVELER_API, `/api/properties${qs ? `?${qs}` : ""}`);
   },
+  property: (id) => request(TRAVELER_API, `/api/properties/${id}`),
 };
 
 export const ownerApi = {

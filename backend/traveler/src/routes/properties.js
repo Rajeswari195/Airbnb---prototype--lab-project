@@ -25,25 +25,32 @@ router.get('/', async (req, res, next) => {
   try {
     const { location = '', startDate, endDate, guests } = req.query;
 
+    // --- HARDENING: validate inputs ---
+    const isISODate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+    const hasDates = isISODate(startDate) && isISODate(endDate);
+    const safeGuests = Number.isFinite(Number(guests)) && Number(guests) > 0 ? Number(guests) : 1;
+    const safeLocation = (location || '').trim();
+    // ----------------------------------
+
     let where = 'WHERE 1=1';
     const params = [];
 
-    if (location) {
+    if (safeLocation) {
       where += ' AND (p.city LIKE ? OR p.address LIKE ?)';
-      params.push(`%${location}%`, `%${location}%`);
+      params.push(`%${safeLocation}%`, `%${safeLocation}%`);
     }
 
-    // First find all properties that match location & guests
+    // First find all properties that match location
     let baseQuery = `SELECT p.id, p.title, p.type, p.price, p.city, p.address,
                             p.bedrooms, p.bathrooms, p.capacity
                        FROM properties p
                      ${where}`;
     const [base] = await pool.query(baseQuery, params);
 
-    // If date range provided, filter out unavailable ones
+    // If a valid date range is provided, filter out unavailable ones
     let ids = base.map(b => b.id);
-    if (startDate && endDate) {
-      const availIds = await propertyIdsAvailable(startDate, endDate, Number(guests || 1));
+    if (hasDates && ids.length) {
+      const availIds = await propertyIdsAvailable(startDate, endDate, safeGuests);
       const set = new Set(availIds);
       ids = ids.filter(id => set.has(id));
     }
@@ -90,4 +97,3 @@ router.get('/:id', async (req, res, next) => {
 });
 
 export default router;
-
