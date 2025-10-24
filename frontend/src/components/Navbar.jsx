@@ -8,11 +8,11 @@ export default function Navbar() {
   const [showMenu, setShowMenu] = useState(false);
   const [showHost, setShowHost] = useState(false);
   const [authed, setAuthed] = useState(false);
+  const [user, setUser] = useState(null); // NEW: keep user for initial
   const menuRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  
   useEffect(() => {
     function onDocClick(e) {
       if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false);
@@ -21,23 +21,22 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  
+  // UPDATED: capture user details (for avatar initial)
   async function checkSession() {
     try {
-      await travelerApi.me();
+      const me = await travelerApi.me();
       setAuthed(true);
+      setUser(me || null);
     } catch {
       setAuthed(false);
+      setUser(null);
     }
   }
 
-  
   useEffect(() => {
     checkSession();
-    
   }, [location.pathname]);
 
-  
   function toggleMenu() {
     const next = !showMenu;
     setShowMenu(next);
@@ -49,9 +48,14 @@ export default function Navbar() {
       await travelerApi.logout();
     } catch (_) {}
     setAuthed(false);
+    setUser(null);
     setShowMenu(false);
     navigate("/");
   }
+
+  // derive initial for avatar
+  const initial =
+    ((user?.name || user?.email || "").trim()[0] || "").toUpperCase() || "U";
 
   return (
     <>
@@ -77,9 +81,20 @@ export default function Navbar() {
               Become a host
             </button>
 
-            <button className="btn btn-light border circle-btn nav-icon" title="Language">
-              <i className="bi bi-globe"></i>
-            </button>
+            {/* REPLACED: globe -> avatar when authed */}
+            {authed ? (
+              <button
+                className="btn border circle-btn nav-avatar"
+                title="Profile"
+                onClick={() => navigate("/profile")}
+              >
+                <span>{initial}</span>
+              </button>
+            ) : (
+              <button className="btn btn-light border circle-btn nav-icon" title="Language">
+                <i className="bi bi-globe"></i>
+              </button>
+            )}
 
             <div className="position-relative" ref={menuRef}>
               <button
@@ -95,23 +110,51 @@ export default function Navbar() {
                 className={`dropdown-menu dropdown-menu-end shadow ${showMenu ? "show" : ""}`}
                 style={{ right: 0, left: "auto" }}
               >
-                <button className="dropdown-item" onClick={() => setShowHost(true)}>
-                  Become a host
-                </button>
-
                 {!authed && (
-                  <button className="dropdown-item" onClick={() => { setShowMenu(false); navigate("/login"); }}>
-                    Log in or Sign up
-                  </button>
+                  <>
+                    <button className="dropdown-item" onClick={() => setShowHost(true)}>
+                      Become a host
+                    </button>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setShowMenu(false);
+                        navigate("/login");
+                      }}
+                    >
+                      Log in or Sign up
+                    </button>
+                    <div className="dropdown-divider"></div>
+                    <a className="dropdown-item" href="#help">Help Center</a>
+                  </>
                 )}
 
-                <div className="dropdown-divider"></div>
-                <a className="dropdown-item" href="#help">Help Center</a>
-
                 {authed && (
-                  <button className="dropdown-item text-danger" onClick={handleLogout}>
-                    Log out
-                  </button>
+                  <>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setShowMenu(false);
+                        navigate("/wishlists");
+                      }}
+                    >
+                      Wishlists
+                    </button>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setShowMenu(false);
+                        navigate("/profile");
+                      }}
+                    >
+                      Profile
+                    </button>
+                    <a className="dropdown-item" href="#help">Help Center</a>
+                    <div className="dropdown-divider"></div>
+                    <button className="dropdown-item text-danger" onClick={handleLogout}>
+                      Log out
+                    </button>
+                  </>
                 )}
               </div>
             </div>
