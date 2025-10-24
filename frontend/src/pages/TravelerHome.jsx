@@ -17,13 +17,10 @@ export default function TravelerHome() {
   });
 
   const submit = () => {
-    // basic date validation: only send both when both are present & in order
     let start = checkIn || undefined;
     let end = checkOut || undefined;
 
     if (start && end && new Date(end) < new Date(start)) {
-      // if invalid, don’t update the committed filters
-      // (you can replace with a toast/UI message later)
       console.warn("End date must be after start date");
       return;
     }

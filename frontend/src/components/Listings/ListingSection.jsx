@@ -8,7 +8,6 @@ export default function ListingSection({ filters }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // Clean filters: drop empty/undefined, only include dates if BOTH present
   const cleanedFilters = useMemo(() => {
     const f = filters || {};
     const out = {};
@@ -37,7 +36,7 @@ export default function ListingSection({ filters }) {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(cleanedFilters)]); // fetch on mount and when effective filters change
+  }, [JSON.stringify(cleanedFilters)]); 
 
   return (
     <section className="container mt-4">

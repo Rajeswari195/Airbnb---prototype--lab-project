@@ -6,7 +6,7 @@ async function request(base, path, opts = {}) {
     method: opts.method || "GET",
     headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
     body: opts.body,
-    credentials: "include",                
+    credentials: "include",
   });
   const ct = res.headers.get("content-type") || "";
   const isJSON = ct.includes("application/json");
@@ -23,10 +23,9 @@ export const travelerApi = {
   login:  (body) => request(TRAVELER_API, "/api/auth/login",  { method: "POST", body: JSON.stringify(body) }),
   logout: ()      => request(TRAVELER_API, "/api/auth/logout", { method: "POST" }),
 
-  me:     ()      => request(TRAVELER_API, "/api/users/me"),
-  
+  me:       ()     => request(TRAVELER_API, "/api/users/me"),
   updateMe: (body) => request(TRAVELER_API, "/api/users/me", { method: "PUT", body: JSON.stringify(body) }),
-  
+
   uploadAvatar: async (file) => {
     const form = new FormData();
     form.append("file", file);
@@ -45,12 +44,13 @@ export const travelerApi = {
     return data;
   },
 
-  
-  listings: (params={}) => {
+  listings: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(TRAVELER_API, `/api/properties${qs ? `?${qs}` : ""}`);
   },
-  property: (id) => request(TRAVELER_API, `/api/properties/${id}`),
+
+  property:    (id) => request(TRAVELER_API, `/api/properties/${id}`),
+  getProperty: (id) => request(TRAVELER_API, `/api/properties/${id}`), 
 };
 
 export const ownerApi = {
