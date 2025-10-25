@@ -14,6 +14,8 @@ import userRoutes from './routes/users.js';
 import propertyRoutes from './routes/properties.js';
 import bookingRoutes from './routes/bookings.js';
 import dashboardRoutes from './routes/dashboard.js';
+import ssoRoutes from './routes/sso.js';       // <-- added
+import hostRoutes from './routes/host.js';     // <-- added
 
 const app = express();
 
@@ -53,10 +55,12 @@ app.use('/uploads', express.static(path.resolve(__dirname, '..', 'uploads')));
 // ---- Mount API routes ----
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/auth', ssoRoutes);          // <-- added (POST /api/auth/exchange)
 app.use('/api/users', userRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/host', hostRoutes);         // <-- added (POST /api/host/enable)
 
 // ---- Swagger UI at /api-docs (no auto-open) ----
 const openapiPath = path.resolve(__dirname, 'openapi.json');
