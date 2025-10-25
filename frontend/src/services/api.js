@@ -50,12 +50,22 @@ export const travelerApi = {
   },
 
   property:    (id) => request(TRAVELER_API, `/api/properties/${id}`),
-  getProperty: (id) => request(TRAVELER_API, `/api/properties/${id}`), 
+  getProperty: (id) => request(TRAVELER_API, `/api/properties/${id}`),
 
   getFavorites: () => request(TRAVELER_API, "/api/favorites"),
   addFavorite:  (propertyId) =>
     request(TRAVELER_API, "/api/favorites", { method: "POST", body: JSON.stringify({ propertyId }) }),
   removeFavorite: (favoriteId) =>
     request(TRAVELER_API, `/api/favorites/${favoriteId}`, { method: "DELETE" }),
+
+  createBooking: (body) =>
+    request(TRAVELER_API, "/api/bookings", { method: "POST", body: JSON.stringify(body) }),
+  listBookings: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(TRAVELER_API, `/api/bookings${qs ? `?${qs}` : ""}`);
+  },
+  cancelBooking: (id) =>
+    request(TRAVELER_API, `/api/bookings/${id}/cancel`, { method: "POST" }),
 };
+
 export const ownerApi = {};

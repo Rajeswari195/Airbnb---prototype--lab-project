@@ -6,7 +6,10 @@ import Signup from "pages/Signup";
 import ProtectedRoute from "routes/ProtectedRoute";
 import PropertyDetails from "./pages/PropertyDetails";
 import Profile from "./pages/Profile";
-import Wishlists from "./pages/Wishlists"; // <<< add
+import Wishlists from "./pages/Wishlists";
+import BookingRequest from "./pages/BookingRequest";  
+import Bookings from "./pages/Bookings";              
+import BookingDetails from "./pages/BookingDetails";  
 
 export default function App() {
   return (
@@ -18,8 +21,10 @@ export default function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/properties/:id" element={<PropertyDetails />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/wishlists" element={<Wishlists />} /> {/* <<< add */}
-
+          <Route path="/wishlists" element={<Wishlists />} />
+          <Route path="/booking-request" element={<BookingRequest />} />
+          <Route path="/bookings" element={<Bookings />} />
+          <Route path="/bookings/:id" element={<BookingDetails />} />
           <Route
             path="/owner"
             element={
@@ -28,7 +33,6 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppLayout>

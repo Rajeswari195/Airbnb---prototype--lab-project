@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { travelerApi } from "../services/api";
-import "./Login.css"; 
+import "./Login.css";
 
 export default function Signup() {
   const [name, setName] = useState("");
@@ -10,8 +10,8 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const navigate = useNavigate();
-  const location = useLocation(); 
-  const pending = location.state || null; 
+  const location = useLocation();
+  const pending = location.state || null;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -19,6 +19,7 @@ export default function Signup() {
     setErr("");
     try {
       await travelerApi.signup({ name: name.trim(), email, password });
+
       navigate("/login", { state: pending, replace: true });
     } catch (e) {
       setErr(e.message || "Signup failed");
@@ -83,7 +84,7 @@ export default function Signup() {
           <button
             className="btn btn-outline-dark btn-lg"
             type="button"
-            onClick={() => navigate("/login", { state: pending })}  
+            onClick={() => navigate("/login", { state: pending })}
           >
             <i className="bi bi-envelope me-2"></i> Log in
           </button>

@@ -43,36 +43,24 @@ export default function PropertyDetails() {
 
   async function handleReserve() {
     setErr("");
-    try {
-      if (!checkIn || !checkOut) {
-        setErr("Please select check-in and check-out.");
-        return;
-      }
-      if (new Date(checkOut) <= new Date(checkIn)) {
-        setErr("Check-out must be after check-in.");
-        return;
-      }
-      await travelerApi.createBooking({
-        propertyId: Number(id),
-        startDate: checkIn,
-        endDate: checkOut,
-        guests: Number(guests) || 1,
-      });
-      alert("Reservation request submitted!");
-    } catch (e) {
-      if ((e.message || "").toLowerCase().includes("unauthorized")) {
-        navigate("/login", { state: { from: `/property/${id}` } });
-        return;
-      }
-      setErr(e.message || "Failed to reserve");
+
+    if (!checkIn || !checkOut) {
+      setErr("Please select check-in and check-out.");
+      return;
     }
+    if (new Date(checkOut) <= new Date(checkIn)) {
+      setErr("Check-out must be after check-in.");
+      return;
+    }
+    navigate(
+      `/booking-request?propertyId=${Number(id)}&startDate=${checkIn}&endDate=${checkOut}&guests=${Number(guests) || 1}`
+    );
   }
 
-  
   const photos = (() => {
     const arr = Array.isArray(p?.photos) ? p.photos : [];
     if (arr.length) return arr;
-    
+
     return [
       "https://picsum.photos/1200/800?blur=1",
       "https://picsum.photos/600/400?blur=2",
@@ -111,7 +99,7 @@ export default function PropertyDetails() {
 
   if (!p) return null;
 
-  
+
   const priceNum = p.price != null ? Number(p.price) : null;
   const priceLine =
     nights > 0 && priceNum != null
@@ -123,28 +111,23 @@ export default function PropertyDetails() {
   const todayISO = new Date().toISOString().slice(0, 10);
   const endMin = checkIn || todayISO;
 
-  
   const thumbsCount = Math.min(4, Math.max(0, photos.length - 1));
   const thumbs = photos.slice(1, 1 + thumbsCount);
   const showMoreButton = photos.length >= 5; 
   const primary = photos[0];
 
-  
   const galleryClass = thumbsCount === 0 ? "pd-gallery pd-gallery--single" : "pd-gallery";
-  
   const rightGridClass = thumbsCount === 1 ? "pd-grid pd-grid--c1" : "pd-grid pd-grid--c2";
 
   return (
     <div className="container py-4">
       <h3 className="mb-3">{p.title}</h3>
 
-      
       <div className={galleryClass}>
         <div className="pd-hero">
           <img src={primary} alt="Primary" />
         </div>
 
-        
         {thumbsCount > 0 && (
           <div className={rightGridClass}>
             {thumbs.map((src, i) => {
@@ -169,7 +152,6 @@ export default function PropertyDetails() {
         )}
       </div>
 
-      
       {showAll && (
         <div className="pd-lightbox" onClick={() => setShowAll(false)}>
           <div className="pd-lightbox-inner" onClick={(e) => e.stopPropagation()}>
@@ -261,10 +243,6 @@ export default function PropertyDetails() {
                   ))}
                 </select>
               </div>
-
-              <button type="button" className="free-cancel mt-3" disabled>
-                Free cancellation
-              </button>
 
               {err && <div className="alert alert-danger mt-3 mb-2">{err}</div>}
 

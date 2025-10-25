@@ -12,7 +12,6 @@ const createSchema = Joi.object({
   guests: Joi.number().integer().min(1).required(),
 });
 
-/** POST /api/bookings  (create Pending booking) */
 router.post('/', requireAuth, async (req, res, next) => {
   try {
     const payload = await createSchema.validateAsync(req.body, { abortEarly: false });
@@ -22,12 +21,10 @@ router.post('/', requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: 'endDate must be after startDate' });
     }
 
-    // capacity check
     const [[prop]] = await pool.query('SELECT capacity FROM properties WHERE id = ?', [propertyId]);
     if (!prop) return res.status(404).json({ error: 'Property not found' });
     if (guests > prop.capacity) return res.status(400).json({ error: 'Guests exceed capacity' });
 
-    // overlap check (Pending/Accepted)
     const [overlap] = await pool.query(
       `SELECT 1 FROM bookings
         WHERE property_id = ?
@@ -52,7 +49,6 @@ router.post('/', requireAuth, async (req, res, next) => {
   }
 });
 
-/** GET /api/bookings?status=Pending|Accepted|Cancelled&scope=past */
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const { status, scope } = req.query;
@@ -77,6 +73,33 @@ router.get('/', requireAuth, async (req, res, next) => {
       params
     );
     res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id/cancel', requireAuth, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+
+    const [[row]] = await pool.query(
+      'SELECT id, user_id AS userId, status FROM bookings WHERE id = ?',
+      [id]
+    );
+    if (!row || row.userId !== req.session.userId) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (row.status === 'Cancelled') {
+      return res.json({ id, status: 'Cancelled' });
+    }
+    if (row.status !== 'Pending') {
+      return res.status(400).json({ error: 'Only Pending bookings can be cancelled' });
+    }
+
+    await pool.query('UPDATE bookings SET status = "Cancelled" WHERE id = ?', [id]);
+    res.json({ id, status: 'Cancelled' });
   } catch (err) {
     next(err);
   }

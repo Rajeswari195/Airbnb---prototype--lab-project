@@ -9,8 +9,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const navigate = useNavigate();
-  const location = useLocation(); 
-  const pending = location.state || null; 
+  const location = useLocation();
+  const pending = location.state || null;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -19,12 +19,15 @@ export default function Login() {
     try {
       await travelerApi.login({ email, password });
 
-
       if (pending && pending.intent === "favorite" && pending.propertyId) {
-        try {
-          await travelerApi.addFavorite(Number(pending.propertyId));
-        } catch {}
+        try { await travelerApi.addFavorite(Number(pending.propertyId)); } catch {}
         navigate(pending.from || "/", { replace: true });
+        return;
+      }
+
+      if (pending && pending.intent === "booking" && pending.propertyId && pending.startDate && pending.endDate && pending.guests) {
+        const url = `/booking-request?propertyId=${pending.propertyId}&startDate=${pending.startDate}&endDate=${pending.endDate}&guests=${pending.guests}`;
+        navigate(url, { replace: true });
         return;
       }
 
@@ -90,7 +93,7 @@ export default function Login() {
           <button
             className="btn btn-outline-dark btn-lg"
             type="button"
-            onClick={() => navigate("/signup", { state: pending })}  
+            onClick={() => navigate("/signup", { state: pending })}
           >
             <i className="bi bi-envelope me-2"></i> Create an account
           </button>
