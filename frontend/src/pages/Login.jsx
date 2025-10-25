@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { travelerApi } from "../services/api";
 import "./Login.css";
 
@@ -9,14 +9,26 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const navigate = useNavigate();
+  const location = useLocation(); 
+  const pending = location.state || null; 
 
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
     setErr("");
     try {
-      await travelerApi.login({ email, password }); 
-      navigate("/"); 
+      await travelerApi.login({ email, password });
+
+
+      if (pending && pending.intent === "favorite" && pending.propertyId) {
+        try {
+          await travelerApi.addFavorite(Number(pending.propertyId));
+        } catch {}
+        navigate(pending.from || "/", { replace: true });
+        return;
+      }
+
+      navigate("/", { replace: true });
     } catch (e) {
       setErr(e.message || "Login failed");
     } finally {
@@ -78,14 +90,14 @@ export default function Login() {
           <button
             className="btn btn-outline-dark btn-lg"
             type="button"
-            onClick={() => navigate("/signup")}
+            onClick={() => navigate("/signup", { state: pending })}  
           >
             <i className="bi bi-envelope me-2"></i> Create an account
           </button>
         </div>
 
         <div className="auth-footer mt-3">
-          New here? <Link to="/signup">Create an account</Link>
+          New here? <Link to="/signup" state={pending}>Create an account</Link>
         </div>
       </div>
     </div>
