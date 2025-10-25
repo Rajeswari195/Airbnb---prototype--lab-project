@@ -5,7 +5,8 @@ import Login from "pages/Login";
 import Signup from "pages/Signup";
 import ProtectedRoute from "routes/ProtectedRoute";
 import PropertyDetails from "./pages/PropertyDetails";
-
+import Profile from "./pages/Profile";
+import Wishlists from "./pages/Wishlists"; // <<< add
 
 export default function App() {
   return (
@@ -16,6 +17,8 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/properties/:id" element={<PropertyDetails />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/wishlists" element={<Wishlists />} /> {/* <<< add */}
 
           <Route
             path="/owner"

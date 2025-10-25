@@ -51,7 +51,11 @@ export const travelerApi = {
 
   property:    (id) => request(TRAVELER_API, `/api/properties/${id}`),
   getProperty: (id) => request(TRAVELER_API, `/api/properties/${id}`), 
-};
 
-export const ownerApi = {
+  getFavorites: () => request(TRAVELER_API, "/api/favorites"),
+  addFavorite:  (propertyId) =>
+    request(TRAVELER_API, "/api/favorites", { method: "POST", body: JSON.stringify({ propertyId }) }),
+  removeFavorite: (favoriteId) =>
+    request(TRAVELER_API, `/api/favorites/${favoriteId}`, { method: "DELETE" }),
 };
+export const ownerApi = {};

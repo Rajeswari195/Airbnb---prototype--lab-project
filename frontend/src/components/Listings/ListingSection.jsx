@@ -8,6 +8,8 @@ export default function ListingSection({ filters }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
+  const [favMap, setFavMap] = useState({});
+
   const cleanedFilters = useMemo(() => {
     const f = filters || {};
     const out = {};
@@ -31,12 +33,44 @@ export default function ListingSection({ filters }) {
     } finally {
       setLoading(false);
     }
+
+    try {
+      const favs = await travelerApi.getFavorites();
+      const map = {};
+      (Array.isArray(favs) ? favs : []).forEach((f) => {
+        map[f.propertyId] = f.id; 
+      });
+      setFavMap(map);
+    } catch (_) {
+      setFavMap({});
+    }
   }
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(cleanedFilters)]); 
+  }, [JSON.stringify(cleanedFilters)]);
+
+  async function toggleFavorite(propertyId) {
+    try {
+      if (favMap[propertyId]) {
+        await travelerApi.removeFavorite(favMap[propertyId]);
+        setFavMap((m) => {
+          const n = { ...m };
+          delete n[propertyId];
+          return n;
+        });
+      } else {
+        await travelerApi.addFavorite(propertyId);
+        const favs = await travelerApi.getFavorites();
+        const map = {};
+        (Array.isArray(favs) ? favs : []).forEach((f) => (map[f.propertyId] = f.id));
+        setFavMap(map);
+      }
+    } catch (e) {
+      console.warn("Favorite toggle failed:", e.message);
+    }
+  }
 
   return (
     <section className="container mt-4">
@@ -69,7 +103,11 @@ export default function ListingSection({ filters }) {
             ))
           : items.map((it) => (
               <div key={it.id} className="col">
-                <ListingCard item={it} />
+                <ListingCard
+                  item={it}
+                  isFavorite={!!favMap[it.id]}
+                  onToggleFavorite={toggleFavorite}
+                />
               </div>
             ))}
       </div>

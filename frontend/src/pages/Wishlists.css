@@ -1,0 +1,21 @@
+.wishlist-thumb {
+  position: relative;
+  padding-top: 66.66%;
+  background: #f7f7f7;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+
+.wishlist-remove-btn {
+  width: 36px;
+  height: 36px;
+  z-index: 2;              
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wishlist-remove-btn__glyph {
+  font-size: 18px;
+  line-height: 1;
+}

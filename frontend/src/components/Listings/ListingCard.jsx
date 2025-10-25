@@ -1,7 +1,7 @@
 import "./ListingCard.css";
 import { Link } from "react-router-dom";
 
-export default function ListingCard({ item }) {
+export default function ListingCard({ item, isFavorite = false, onToggleFavorite }) {
   const title = item.title || "Untitled";
   const type = item.type || "";
   const city = item.city || "";
@@ -19,6 +19,21 @@ export default function ListingCard({ item }) {
           <div className="listing-thumb placeholder-wave">
             <div className="placeholder w-100 h-100"></div>
           </div>
+
+          {typeof onToggleFavorite === "function" && (
+            <button
+              className={`wish-heart btn ${isFavorite ? "wish-heart--active" : ""}`}
+              aria-label={isFavorite ? "Remove from favorites" : "Save to favorites"}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleFavorite(item.id);
+              }}
+              title={isFavorite ? "Saved" : "Save"}
+            >
+              <i className={`bi ${isFavorite ? "bi-heart-fill" : "bi-heart"}`} />
+            </button>
+          )}
         </div>
 
         <div className="card-body">

@@ -8,7 +8,7 @@ export default function Navbar() {
   const [showMenu, setShowMenu] = useState(false);
   const [showHost, setShowHost] = useState(false);
   const [authed, setAuthed] = useState(false);
-  const [user, setUser] = useState(null); // NEW: keep user for initial
+  const [user, setUser] = useState(null); 
   const menuRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
