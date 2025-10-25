@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import pool from '../db/pool.js';
+import jwt from 'jsonwebtoken';
+import requireAuth from '../middleware/auth.js';
 
 const router = Router();
 
@@ -63,6 +65,21 @@ router.post('/logout', (req, res) => {
   } else {
     res.status(204).end();
   }
+});
+
+/**
+ * POST /api/auth/session-token
+ * Returns a short-lived token (120s) representing the current session
+ * for Owner API to exchange and set its own session.
+ */
+router.post('/session-token', requireAuth, (req, res) => {
+  const payload = { id: req.session.userId, role: req.session.role || 'traveler' };
+  const token = jwt.sign(
+    payload,
+    process.env.SSO_JWT_SECRET || 'dev_sso_secret',
+    { expiresIn: '120s', issuer: 'traveler-api', audience: 'owner-api' }
+  );
+  res.json({ token });
 });
 
 export default router;
