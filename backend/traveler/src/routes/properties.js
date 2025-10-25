@@ -40,7 +40,13 @@ router.get('/', async (req, res, next) => {
       params.push(`%${safeLocation}%`, `%${safeLocation}%`);
     }
 
-    // First find all properties that match location
+    // NEW: enforce capacity whenever guests is provided (works with or without dates)
+    if (guests && Number(guests) > 0) {
+      where += ' AND p.capacity >= ?';
+      params.push(safeGuests);
+    }
+
+    // First find all properties that match location (+ capacity if guests supplied)
     let baseQuery = `SELECT p.id, p.title, p.type, p.price, p.city, p.address,
                             p.bedrooms, p.bathrooms, p.capacity
                        FROM properties p
