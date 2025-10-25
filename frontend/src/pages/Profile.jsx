@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { travelerApi } from "../services/api";
 import ProfileModal from "../components/Profile/ProfileModal";
 import "./Profile.css";
@@ -9,12 +10,8 @@ export default function Profile() {
   const [err, setErr] = useState("");
   const [showModal, setShowModal] = useState(false);
 
-  const [activeTab, setActiveTab] = useState("about");
-
-  const [pastTrips, setPastTrips] = useState([]);
-  const [pastLoading, setPastLoading] = useState(false);
-  const [pastErr, setPastErr] = useState("");
-  const [pastLoaded, setPastLoaded] = useState(false);
+  const [activeSection, setActiveSection] = useState("about"); 
+  const navigate = useNavigate();
 
   async function load() {
     setLoading(true);
@@ -36,37 +33,20 @@ export default function Profile() {
 
   const isComplete = useMemo(() => {
     if (!me) return false;
-    return !!(
-      me.about?.trim() ||
-      me.city?.trim() ||
-      me.state?.trim() ||
-      me.country?.trim() ||
-      (me.languages?.length) ||
-      me.gender?.trim() ||
-      me.phone?.trim()
-    );
+    const hasAny =
+      !!(me.about && me.about.trim()) ||
+      !!(me.city && me.city.trim()) ||
+      !!(me.state && me.state.trim()) ||
+      !!(me.country && me.country.trim()) ||
+      (!!me.languages && me.languages.length > 0) ||
+      !!(me.gender && me.gender.trim()) ||
+      !!(me.phone && me.phone.trim());
+    return hasAny;
   }, [me]);
 
   function openComplete() { setShowModal(true); }
   function openEdit() { setShowModal(true); }
   function onSaved(updated) { setMe(updated); setShowModal(false); }
-
-  useEffect(() => {
-    async function loadPast() {
-      setPastLoading(true);
-      setPastErr("");
-      try {
-        const rows = await travelerApi.listBookings({ scope: "past" });
-        setPastTrips(Array.isArray(rows) ? rows : []);
-      } catch (e) {
-        setPastErr(e.message || "Failed to load past trips");
-      } finally {
-        setPastLoading(false);
-        setPastLoaded(true);
-      }
-    }
-    if (activeTab === "past" && !pastLoaded) loadPast();
-  }, [activeTab, pastLoaded]);
 
   if (loading) return <div className="container py-5">Loading…</div>;
   if (err) return <div className="container py-5 text-danger">{err}</div>;
@@ -78,100 +58,116 @@ export default function Profile() {
     <div className="container py-4">
       <div className="profile-layout">
         {/* Left rail */}
-        <aside>
-          <h3 className="profile-rail-title">About me</h3>
+        <div>
+          <h2 className="profile-rail-title">Profile</h2>
+          <div className="profile-rail-nav">
 
-          <nav className="profile-rail-nav">
             <button
               type="button"
-              className={`profile-rail-item ${activeTab === "about" ? "active" : ""}`}
-              onClick={() => setActiveTab("about")}
+              className={`profile-rail-item ${activeSection === "about" ? "active" : ""}`}
+              onClick={() => setActiveSection("about")}
             >
-              <i className="bi bi-person-circle me-2" />
+              <span className="me-2"><i className="bi bi-person-circle" /></span>
               About me
             </button>
 
             <button
               type="button"
-              className={`profile-rail-item ${activeTab === "past" ? "active" : ""}`}
-              onClick={() => setActiveTab("past")}
+              className={`profile-rail-item ${activeSection === "past" ? "active" : ""}`}
+              onClick={() => setActiveSection("past")}
             >
-              <i className="bi bi-suitcase-fill me-2" />
+              <span className="me-2"><i className="bi bi-suitcase-lg" /></span>
               Past trips
             </button>
 
-            <button type="button" className="profile-rail-item">
-              <i className="bi bi-people-fill me-2" />
-              Connections
+            <button
+              type="button"
+              className="profile-rail-item"
+              onClick={() => navigate("/bookings")}
+            >
+              <span className="me-2"><i className="bi bi-journal-bookmark" /></span>
+              Bookings
             </button>
-          </nav>
-        </aside>
+          </div>
+        </div>
 
-        <main>
-          {activeTab === "about" && (
-            <div className="profile-grid">
-              <section>
-                <div className="card shadow-sm profile-card">
-                  <div className="card-body d-flex align-items-center flex-column py-4">
+        <div>
+          {activeSection === "about" && (
+            <>
+              <div className="card profile-card shadow-sm mb-3">
+                <div className="card-body d-flex align-items-center flex-column py-4">
+                  {me.avatar_url ? (
+                    <img src={me.avatar_url} alt="avatar" className="profile-avatar-img" />
+                  ) : (
                     <div className="profile-avatar">{initial}</div>
-                    <h4 className="mt-3 mb-1 profile-name">{me.name || me.email}</h4>
-                    <div className="text-muted">Guest</div>
-                  </div>
+                  )}
+                  <h4 className="mt-3 mb-1 profile-name">{me.name || me.email}</h4>
+                  <div className="text-muted">Guest</div>
                 </div>
+              </div>
 
-                {isComplete && (
-                  <div className="card shadow-sm mt-3 position-relative profile-edit-card">
-                    <button
-                      className="btn btn-outline-dark btn-sm position-absolute top-0 end-0 m-2"
-                      onClick={openEdit}
-                    >
-                      Edit
-                    </button>
+              {isComplete && (
+                <div className="card profile-edit-card shadow-sm position-relative">
+                  <button
+                    className="btn btn-outline-dark btn-sm position-absolute top-0 end-0 m-2"
+                    onClick={openEdit}
+                  >
+                    Edit
+                  </button>
 
-                    <div className="card-body">
-                      <h6 className="fw-semibold mb-3">Profile information</h6>
-                      <dl className="row mb-0">
-                        <dt className="col-sm-4">Name</dt>
-                        <dd className="col-sm-8">{me.name}</dd>
+                  <div className="card-body">
+                    <h6 className="fw-semibold mb-3">Profile information</h6>
+                    <dl className="row mb-0">
+                      <dt className="col-sm-4">Name</dt>
+                      <dd className="col-sm-8">{me.name}</dd>
 
-                        <dt className="col-sm-4">Email</dt>
-                        <dd className="col-sm-8">{me.email}</dd>
+                      <dt className="col-sm-4">Email</dt>
+                      <dd className="col-sm-8">{me.email}</dd>
 
-                        {me.phone && <>
+                      {me.phone ? (
+                        <>
                           <dt className="col-sm-4">Phone</dt>
                           <dd className="col-sm-8">{me.phone}</dd>
-                        </>}
+                        </>
+                      ) : null}
 
-                        {me.about && <>
+                      {me.about ? (
+                        <>
                           <dt className="col-sm-4">About me</dt>
                           <dd className="col-sm-8">{me.about}</dd>
-                        </>}
+                        </>
+                      ) : null}
 
-                        {(me.city || me.state || me.country) && <>
+                      {(me.city || me.state || me.country) ? (
+                        <>
                           <dt className="col-sm-4">Location</dt>
                           <dd className="col-sm-8">
                             {[me.city, me.state, me.country].filter(Boolean).join(", ")}
                           </dd>
-                        </>}
+                        </>
+                      ) : null}
 
-                        {me.languages?.length > 0 && <>
+                      {me.languages?.length ? (
+                        <>
                           <dt className="col-sm-4">Languages</dt>
                           <dd className="col-sm-8">{me.languages.join(", ")}</dd>
-                        </>}
+                        </>
+                      ) : null}
 
-                        {me.gender && <>
+                      {me.gender ? (
+                        <>
                           <dt className="col-sm-4">Gender</dt>
                           <dd className="col-sm-8">{me.gender}</dd>
-                        </>}
-                      </dl>
-                    </div>
+                        </>
+                      ) : null}
+                    </dl>
                   </div>
-                )}
-              </section>
+                </div>
+              )}
 
               {!isComplete && (
-                <aside className="profile-side card p-3 d-none d-lg-block">
-                  <div>
+                <div className="card shadow-sm">
+                  <div className="card-body">
                     <h5 className="mb-2">Complete your profile</h5>
                     <p className="text-muted small mb-3">
                       Your profile helps hosts and guests know you better. Add your
@@ -181,44 +177,20 @@ export default function Profile() {
                       Get started
                     </button>
                   </div>
-                </aside>
+                </div>
               )}
+            </>
+          )}
+
+          {activeSection === "past" && (
+            <div className="card shadow-sm">
+              <div className="card-body">
+                <h5 className="mb-3">Past trips</h5>
+                <div className="text-muted">No past trips yet.</div>
+              </div>
             </div>
           )}
-
-          {activeTab === "past" && (
-            <section className="card shadow-sm profile-card">
-              <div className="card-body">
-                <h6 className="fw-semibold mb-3">Past trips</h6>
-
-                {pastLoading && <div>Loading…</div>}
-                {pastErr && <div className="alert alert-danger">{pastErr}</div>}
-
-                {!pastLoading && !pastErr && pastTrips.length === 0 && (
-                  <div className="text-muted">No past trips yet.</div>
-                )}
-
-                {!pastLoading && !pastErr && pastTrips.length > 0 && (
-                  <ul className="list-unstyled mb-0">
-                    {pastTrips.map((b) => (
-                      <li key={b.id} className="mb-3">
-                        <div className="d-flex justify-content-between">
-                          <div>
-                            <div className="fw-semibold">{b.title}</div>
-                            <div className="small text-muted">
-                              {b.startDate?.slice(0, 10)} → {b.endDate?.slice(0, 10)} · {b.guests} guest{b.guests > 1 ? "s" : ""}
-                            </div>
-                          </div>
-                          <span className="badge text-bg-secondary align-self-start">{b.status}</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </section>
-          )}
-        </main>
+        </div>
       </div>
 
       {showModal && (
