@@ -26,6 +26,7 @@ app.use(express.urlencoded({ extended: true }));
 // ---- CORS ----
 const allowed = [
   process.env.CORS_ORIGIN || 'http://localhost:5173',
+  'http://localhost:3000',
   `http://localhost:${process.env.PORT || 8001}`
 ];
 app.use(cors({
@@ -35,7 +36,7 @@ app.use(cors({
 
 // ---- Sessions ----
 app.use(session({
-  name: 'sid',
+  name: 'owner_sid',
   secret: process.env.SESSION_SECRET || 'dev_fallback_secret',
   resave: false,
   saveUninitialized: false,
@@ -55,12 +56,12 @@ app.use('/uploads', express.static(path.resolve(__dirname, '..', 'uploads')));
 // ---- Mount API routes ----
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/auth', ssoRoutes);          // <-- added (POST /api/auth/exchange)
+app.use('/api/auth', ssoRoutes);          
 app.use('/api/users', userRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/host', hostRoutes);         // <-- added (POST /api/host/enable)
+app.use('/api/host', hostRoutes);         
 
 // ---- Swagger UI at /api-docs (no auto-open) ----
 const openapiPath = path.resolve(__dirname, 'openapi.json');
@@ -85,7 +86,6 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: err.message || 'Server error' });
 });
 
-// ---- Start server ----
 const port = Number(process.env.PORT || 8001);
 app.listen(port, () => {
   console.log(`Owner API listening on :${port}`);

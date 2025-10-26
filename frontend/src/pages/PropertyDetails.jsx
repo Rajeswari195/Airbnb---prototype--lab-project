@@ -99,7 +99,6 @@ export default function PropertyDetails() {
 
   if (!p) return null;
 
-
   const priceNum = p.price != null ? Number(p.price) : null;
   const priceLine =
     nights > 0 && priceNum != null
@@ -113,11 +112,23 @@ export default function PropertyDetails() {
 
   const thumbsCount = Math.min(4, Math.max(0, photos.length - 1));
   const thumbs = photos.slice(1, 1 + thumbsCount);
-  const showMoreButton = photos.length >= 5; 
+  const showMoreButton = photos.length >= 5;
   const primary = photos[0];
 
   const galleryClass = thumbsCount === 0 ? "pd-gallery pd-gallery--single" : "pd-gallery";
   const rightGridClass = thumbsCount === 1 ? "pd-grid pd-grid--c1" : "pd-grid pd-grid--c2";
+
+  let amenitiesList = "";
+  if (p?.amenities) {
+    try {
+      const arr = Array.isArray(p.amenities) ? p.amenities : JSON.parse(p.amenities || "[]");
+      if (Array.isArray(arr) && arr.length) {
+        amenitiesList = arr.join(", ");
+      }
+    } catch {
+
+    }
+  }
 
   return (
     <div className="container py-4">
@@ -185,6 +196,12 @@ export default function PropertyDetails() {
             {p.bathrooms != null && <span className="me-3">{p.bathrooms} bathroom</span>}
             {p.capacity != null && <span className="me-3">{p.capacity} guests</span>}
           </div>
+
+          {amenitiesList && (
+            <div className="small text-muted mt-1">
+              <strong>Amenities:</strong> {amenitiesList}
+            </div>
+          )}
 
           {p.description && <p className="mt-3">{p.description}</p>}
         </div>

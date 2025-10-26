@@ -1,0 +1,8 @@
+.owner-listings .property-card {
+  border-radius: 12px;
+  border: 1px solid #f1f1f1;
+}
+
+.owner-listings .modal-content {
+  border-radius: 12px;
+}

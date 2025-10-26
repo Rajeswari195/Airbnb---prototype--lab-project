@@ -30,14 +30,12 @@
 .profile-rail-item .bi { font-size: 18px; margin-right: 8px; }
 .profile-rail-item:hover { background: #f7f7f7; }
 
-/* Remove the inset border “box” on active; keep a subtle background only */
 .profile-rail-item.active {
   background: #f5f5f5;
-  box-shadow: none;            /* removed inset border */
-  border-color: transparent;   /* ensure no border shows */
+  box-shadow: none;            
+  border-color: transparent;   
 }
 
-/* Remove focus outlines/boxes completely */
 .profile-rail-item:focus,
 .profile-rail-item:focus-visible {
   outline: none;

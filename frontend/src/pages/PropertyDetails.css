@@ -1,11 +1,9 @@
-/* ======= Gallery (fixed space) ======= */
 .pd-gallery {
   display: grid;
   grid-template-columns: 2fr 1.2fr;
   gap: 12px;
 }
 
-/* single-column when only 1 photo total */
 .pd-gallery--single {
   grid-template-columns: 1fr;
 }
@@ -24,26 +22,22 @@
   object-fit: cover;
 }
 
-/* Right grid must fill hero height and create equal cells */
 .pd-grid {
   display: grid;
   gap: 12px;
   height: 100%;                  
 }
 
-/* Exactly 1 thumb -> single column, one tall cell */
 .pd-grid--c1 {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;       
 }
 
-/* 2–4 thumbs -> 2 columns × 2 rows (equal tiles) */
 .pd-grid--c2 {
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;   
 }
 
-/* Each thumbnail fills its grid cell exactly */
 .pd-thumb {
   position: relative;
   width: 100%;
@@ -58,7 +52,6 @@
   object-fit: cover;             
 }
 
-/* Show more button over last tile */
 .pd-showmore-btn {
   position: absolute;
   right: 10px;
@@ -108,7 +101,6 @@
   border-radius: 10px;
 }
 
-/* ======= Reservation Card (with bottom spacing to clear footer) ======= */
 .reserve-card {
   position: sticky;
   top: 96px;

@@ -10,6 +10,7 @@ import Wishlists from "./pages/Wishlists";
 import BookingRequest from "./pages/BookingRequest";  
 import Bookings from "./pages/Bookings";              
 import BookingDetails from "./pages/BookingDetails";  
+import OwnerLayout from "pages/owner/Layout";          
 
 export default function App() {
   return (
@@ -25,14 +26,16 @@ export default function App() {
           <Route path="/booking-request" element={<BookingRequest />} />
           <Route path="/bookings" element={<Bookings />} />
           <Route path="/bookings/:id" element={<BookingDetails />} />
+
           <Route
-            path="/owner"
+            path="/owner/*"
             element={
               <ProtectedRoute>
-                <div>Owner dashboard (coming soon)</div>
+                <OwnerLayout />
               </ProtectedRoute>
             }
           />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppLayout>

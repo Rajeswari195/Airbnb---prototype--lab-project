@@ -1,0 +1,19 @@
+.owner-dashboard .kpi-card {
+  border: 1px solid #f1f1f1;
+  border-radius: 12px;
+}
+
+.owner-dashboard .kpi-label {
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+.owner-dashboard .kpi-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #d00000; /* airbnb-ish red tone */
+}
+
+.owner-dashboard .section-header {
+  margin-bottom: 0.5rem;
+}

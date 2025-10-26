@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { travelerApi } from "../services/api";
+import { travelerApi, ownerApi } from "../services/api";
 import "./Login.css";
+
+const HOST_INTENT_KEY = "host_intent";
 
 export default function Signup() {
   const [name, setName] = useState("");
@@ -13,12 +15,33 @@ export default function Signup() {
   const location = useLocation();
   const pending = location.state || null;
 
+  async function completeHostFlowIfNeeded() {
+    const hasLocalIntent = localStorage.getItem(HOST_INTENT_KEY) === "1";
+    const hasStateIntent = pending && pending.intent === "host";
+    if (!hasLocalIntent && !hasStateIntent) return false;
+
+    try {
+      const { token } = await travelerApi.sessionToken();
+      await ownerApi.exchange(token);
+      await ownerApi.enableHost(); // idempotent
+    } finally {
+      localStorage.removeItem(HOST_INTENT_KEY);
+    }
+    return true;
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
     setErr("");
     try {
       await travelerApi.signup({ name: name.trim(), email, password });
+
+      const wentHost = await completeHostFlowIfNeeded();
+      if (wentHost) {
+        navigate("/owner", { replace: true });
+        return;
+      }
 
       navigate("/login", { state: pending, replace: true });
     } catch (e) {

@@ -1,3 +1,4 @@
+// backend/traveler/src/routes/properties.js
 import { Router } from 'express';
 import pool from '../db/pool.js';
 
@@ -25,12 +26,10 @@ router.get('/', async (req, res, next) => {
   try {
     const { location = '', startDate, endDate, guests } = req.query;
 
-    // --- HARDENING: validate inputs ---
     const isISODate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
     const hasDates = isISODate(startDate) && isISODate(endDate);
     const safeGuests = Number.isFinite(Number(guests)) && Number(guests) > 0 ? Number(guests) : 1;
     const safeLocation = (location || '').trim();
-    // ----------------------------------
 
     let where = 'WHERE 1=1';
     const params = [];
@@ -40,13 +39,18 @@ router.get('/', async (req, res, next) => {
       params.push(`%${safeLocation}%`, `%${safeLocation}%`);
     }
 
-    // NEW: enforce capacity whenever guests is provided (works with or without dates)
+    // Exclude my own listings when logged in (so travelers don't see their own properties)
+    if (req.session?.userId) {
+      where += ' AND (p.owner_id IS NULL OR p.owner_id <> ?)';
+      params.push(req.session.userId);
+    }
+
+    // Enforce capacity whenever guests is provided (works with or without dates)
     if (guests && Number(guests) > 0) {
       where += ' AND p.capacity >= ?';
       params.push(safeGuests);
     }
 
-    // First find all properties that match location (+ capacity if guests supplied)
     let baseQuery = `SELECT p.id, p.title, p.type, p.price, p.city, p.address,
                             p.bedrooms, p.bathrooms, p.capacity
                        FROM properties p
@@ -90,12 +94,10 @@ router.get('/:id', async (req, res, next) => {
     );
     if (!p) return res.status(404).json({ error: 'Property not found' });
 
-    // normalize amenities
     if (typeof p.amenities === 'string') {
       try { p.amenities = JSON.parse(p.amenities); } catch { p.amenities = []; }
     }
 
-    // load photos/availability if you have tables for those
     res.json(p);
   } catch (err) {
     next(err);

@@ -1,0 +1,47 @@
+.owner-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: calc(100vh - 80px);
+  gap: 1rem;
+}
+
+.owner-sidenav {
+  border-right: 1px solid #e9ecef;
+  padding: 1rem;
+}
+
+.owner-sidenav .nav-link {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  border-radius: 999px;
+  padding: .5rem .75rem;
+  font-weight: 600;
+  color: #212529;
+}
+
+.owner-sidenav .nav-link.active,
+.owner-sidenav .nav-link:hover {
+  background: #f8f9fa;
+}
+
+.owner-content {
+  padding: 1rem 1rem 2rem 0;
+}
+
+.kpi-card .kpi-label {
+  font-size: .85rem;
+  color: #6c757d;
+}
+.kpi-card .kpi-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.prop-card .title {
+  font-weight: 700;
+}
+
+.table thead th {
+  white-space: nowrap;
+}

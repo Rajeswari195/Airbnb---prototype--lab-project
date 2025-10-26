@@ -23,6 +23,8 @@ export const travelerApi = {
   login:  (body) => request(TRAVELER_API, "/api/auth/login",  { method: "POST", body: JSON.stringify(body) }),
   logout: ()      => request(TRAVELER_API, "/api/auth/logout", { method: "POST" }),
 
+  sessionToken: () => request(TRAVELER_API, "/api/auth/session-token", { method: "POST" }),
+
   me:       ()     => request(TRAVELER_API, "/api/users/me"),
   updateMe: (body) => request(TRAVELER_API, "/api/users/me", { method: "PUT", body: JSON.stringify(body) }),
 
@@ -52,8 +54,8 @@ export const travelerApi = {
   property:    (id) => request(TRAVELER_API, `/api/properties/${id}`),
   getProperty: (id) => request(TRAVELER_API, `/api/properties/${id}`),
 
-  getFavorites: () => request(TRAVELER_API, "/api/favorites"),
-  addFavorite:  (propertyId) =>
+  getFavorites:  () => request(TRAVELER_API, "/api/favorites"),
+  addFavorite:   (propertyId) =>
     request(TRAVELER_API, "/api/favorites", { method: "POST", body: JSON.stringify({ propertyId }) }),
   removeFavorite: (favoriteId) =>
     request(TRAVELER_API, `/api/favorites/${favoriteId}`, { method: "DELETE" }),
@@ -68,4 +70,49 @@ export const travelerApi = {
     request(TRAVELER_API, `/api/bookings/${id}/cancel`, { method: "POST" }),
 };
 
-export const ownerApi = {};
+export const ownerApi = {
+  exchange: (token) =>
+    request(OWNER_API, "/api/auth/exchange", { method: "POST", body: JSON.stringify({ token }) }),
+
+  enableHost: () =>
+    request(OWNER_API, "/api/host/enable", { method: "POST" }),
+
+  dashboard: () =>
+    request(OWNER_API, "/api/dashboard"),
+
+  listings: () =>
+    request(OWNER_API, "/api/properties"),
+  getListing: (id) =>
+    request(OWNER_API, `/api/properties/${id}`),
+  createListing: (body) =>
+    request(OWNER_API, "/api/properties", { method: "POST", body: JSON.stringify(body) }),
+  updateListing: (id, body) =>
+    request(OWNER_API, `/api/properties/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+
+  uploadPhoto: async (id, file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${OWNER_API}/api/properties/${id}/photos`, {
+      method: "POST",
+      body: form,
+      credentials: "include",
+    });
+    const ct = res.headers.get("content-type") || "";
+    const isJSON = ct.includes("application/json");
+    const data = isJSON ? await res.json().catch(() => null) : await res.text().catch(() => "");
+    if (!res.ok) {
+      const msg = (isJSON && data && (data.error || data.message)) || res.statusText || "Upload failed";
+      throw new Error(msg);
+    }
+    return data;
+  },
+
+  incomingRequests: (status) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request(OWNER_API, `/api/bookings/incoming${qs}`);
+  },
+  acceptBooking: (id) =>
+    request(OWNER_API, `/api/bookings/${id}/accept`, { method: "POST" }),
+  cancelBooking: (id) =>
+    request(OWNER_API, `/api/bookings/${id}/cancel`, { method: "POST" }),
+};

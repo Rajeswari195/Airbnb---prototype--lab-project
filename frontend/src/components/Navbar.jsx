@@ -2,13 +2,15 @@ import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import HostModal from "./HostModal";
 import "./Navbar.css";
-import { travelerApi } from "../services/api";
+import { travelerApi, ownerApi } from "../services/api";
+
+const HOST_INTENT_KEY = "host_intent";
 
 export default function Navbar() {
   const [showMenu, setShowMenu] = useState(false);
   const [showHost, setShowHost] = useState(false);
   const [authed, setAuthed] = useState(false);
-  const [user, setUser] = useState(null); 
+  const [user, setUser] = useState(null);
   const menuRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,7 +23,6 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  // UPDATED: capture user details (for avatar initial)
   async function checkSession() {
     try {
       const me = await travelerApi.me();
@@ -32,10 +33,7 @@ export default function Navbar() {
       setUser(null);
     }
   }
-
-  useEffect(() => {
-    checkSession();
-  }, [location.pathname]);
+  useEffect(() => { checkSession(); }, [location.pathname]);
 
   function toggleMenu() {
     const next = !showMenu;
@@ -44,18 +42,70 @@ export default function Navbar() {
   }
 
   async function handleLogout() {
-    try {
-      await travelerApi.logout();
-    } catch (_) {}
+    try { await travelerApi.logout(); } catch (_) {}
     setAuthed(false);
     setUser(null);
     setShowMenu(false);
     navigate("/");
   }
 
-  // derive initial for avatar
-  const initial =
-    ((user?.name || user?.email || "").trim()[0] || "").toUpperCase() || "U";
+  const initial = ((user?.name || user?.email || "").trim()[0] || "").toUpperCase() || "U";
+  const isOwner = user?.role === "owner";
+  const inHostArea = location.pathname.startsWith("/owner");
+
+  const hostUIMode = inHostArea || !!location.state?.hostMode;
+
+  async function ensureOwnerSession() {
+    const { token } = await travelerApi.sessionToken();
+    await ownerApi.exchange(token);               
+  }
+  async function confirmOwnerReady() {
+    try {
+      await ownerApi.dashboard();
+    } catch {
+      await new Promise(r => setTimeout(r, 150));
+      await ownerApi.dashboard();
+    }
+  }
+
+  async function onHostCtaClick() {
+    if (!authed) {
+      localStorage.setItem(HOST_INTENT_KEY, "1");
+      navigate("/login");
+      return;
+    }
+
+    if (inHostArea && isOwner) {
+      navigate("/");
+      return;
+    }
+
+    if (!isOwner) {
+      try {
+        await ensureOwnerSession();       
+        await ownerApi.enableHost();      
+        await confirmOwnerReady();
+        navigate("/owner");
+      } catch {
+        localStorage.setItem(HOST_INTENT_KEY, "1");
+        navigate("/login");
+      }
+      return;
+    }
+
+    try {
+      await ensureOwnerSession();
+      await confirmOwnerReady();
+      navigate("/owner");
+    } catch {
+      localStorage.setItem(HOST_INTENT_KEY, "1");
+      navigate("/login");
+    }
+  }
+
+  const hostCtaLabel = !authed
+    ? "Become a host"
+    : (isOwner ? (inHostArea ? "Switch to traveler" : "Switch to host") : "Become a host");
 
   return (
     <>
@@ -76,17 +126,16 @@ export default function Navbar() {
           <div className="nav-right">
             <button
               className="btn btn-link text-decoration-none text-dark fw-semibold px-3 nav-host"
-              onClick={() => setShowHost(true)}
+              onClick={onHostCtaClick}
             >
-              Become a host
+              {hostCtaLabel}
             </button>
 
-            {/* REPLACED: globe -> avatar when authed */}
             {authed ? (
               <button
                 className="btn border circle-btn nav-avatar"
                 title="Profile"
-                onClick={() => navigate("/profile")}
+                onClick={() => navigate("/profile", { state: inHostArea ? { hostMode: true } : undefined })}
               >
                 <span>{initial}</span>
               </button>
@@ -112,7 +161,14 @@ export default function Navbar() {
               >
                 {!authed && (
                   <>
-                    <button className="dropdown-item" onClick={() => setShowHost(true)}>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setShowMenu(false);
+                        localStorage.setItem(HOST_INTENT_KEY, "1");
+                        navigate("/login");
+                      }}
+                    >
                       Become a host
                     </button>
                     <button
@@ -131,20 +187,22 @@ export default function Navbar() {
 
                 {authed && (
                   <>
+                    {!hostUIMode && (
+                      <button
+                        className="dropdown-item"
+                        onClick={() => {
+                          setShowMenu(false);
+                          navigate("/wishlists");
+                        }}
+                      >
+                        Wishlists
+                      </button>
+                    )}
                     <button
                       className="dropdown-item"
                       onClick={() => {
                         setShowMenu(false);
-                        navigate("/wishlists");
-                      }}
-                    >
-                      Wishlists
-                    </button>
-                    <button
-                      className="dropdown-item"
-                      onClick={() => {
-                        setShowMenu(false);
-                        navigate("/profile");
+                        navigate("/profile", { state: inHostArea ? { hostMode: true } : undefined });
                       }}
                     >
                       Profile

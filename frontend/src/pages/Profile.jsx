@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { travelerApi } from "../services/api";
 import ProfileModal from "../components/Profile/ProfileModal";
 import "./Profile.css";
@@ -10,8 +10,11 @@ export default function Profile() {
   const [err, setErr] = useState("");
   const [showModal, setShowModal] = useState(false);
 
-  const [activeSection, setActiveSection] = useState("about"); 
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const hostMode = !!location.state?.hostMode;
+  const [activeSection, setActiveSection] = useState("about");
 
   async function load() {
     setLoading(true);
@@ -57,11 +60,9 @@ export default function Profile() {
   return (
     <div className="container py-4">
       <div className="profile-layout">
-        {/* Left rail */}
         <div>
           <h2 className="profile-rail-title">Profile</h2>
           <div className="profile-rail-nav">
-
             <button
               type="button"
               className={`profile-rail-item ${activeSection === "about" ? "active" : ""}`}
@@ -71,23 +72,27 @@ export default function Profile() {
               About me
             </button>
 
-            <button
-              type="button"
-              className={`profile-rail-item ${activeSection === "past" ? "active" : ""}`}
-              onClick={() => setActiveSection("past")}
-            >
-              <span className="me-2"><i className="bi bi-suitcase-lg" /></span>
-              Past trips
-            </button>
+            {!hostMode && (
+              <>
+                <button
+                  type="button"
+                  className={`profile-rail-item ${activeSection === "past" ? "active" : ""}`}
+                  onClick={() => setActiveSection("past")}
+                >
+                  <span className="me-2"><i className="bi bi-suitcase-lg" /></span>
+                  Past trips
+                </button>
 
-            <button
-              type="button"
-              className="profile-rail-item"
-              onClick={() => navigate("/bookings")}
-            >
-              <span className="me-2"><i className="bi bi-journal-bookmark" /></span>
-              Bookings
-            </button>
+                <button
+                  type="button"
+                  className="profile-rail-item"
+                  onClick={() => navigate("/bookings")}
+                >
+                  <span className="me-2"><i className="bi bi-journal-bookmark" /></span>
+                  Bookings
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -182,7 +187,7 @@ export default function Profile() {
             </>
           )}
 
-          {activeSection === "past" && (
+          {activeSection === "past" && !hostMode && (
             <div className="card shadow-sm">
               <div className="card-body">
                 <h5 className="mb-3">Past trips</h5>

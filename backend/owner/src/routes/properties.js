@@ -1,3 +1,4 @@
+// owner/src/routes/properties.js
 import { Router } from 'express';
 import pool from '../db/pool.js';
 import requireAuth from '../middleware/auth.js';
@@ -82,11 +83,19 @@ router.put('/:id', requireAuth, async (req, res, next) => {
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id,title,type,price,city,bedrooms,bathrooms,capacity
+      `SELECT id,title,type,price,city,address,bedrooms,bathrooms,capacity,amenities
          FROM properties WHERE owner_id=? ORDER BY id DESC`,
       [req.session.userId]
     );
-    res.json(rows);
+
+    const out = rows.map(r => {
+      if (typeof r.amenities === 'string') {
+        try { r.amenities = JSON.parse(r.amenities); } catch { r.amenities = []; }
+      }
+      return r;
+    });
+
+    res.json(out);
   } catch (e) { next(e); }
 });
 
@@ -109,7 +118,6 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 router.post('/:id/photos', requireAuth, upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    // You might have a photos table; for now return URL
     res.json({ url: `/uploads/${req.file.filename}` });
   } catch (e) { next(e); }
 });

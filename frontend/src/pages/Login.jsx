@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { travelerApi } from "../services/api";
+import { travelerApi, ownerApi } from "../services/api";
 import "./Login.css";
+
+const HOST_INTENT_KEY = "host_intent"; 
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -12,6 +14,21 @@ export default function Login() {
   const location = useLocation();
   const pending = location.state || null;
 
+  async function completeHostFlowIfNeeded() {
+    const hasLocalIntent = localStorage.getItem(HOST_INTENT_KEY) === "1";
+    const hasStateIntent = pending && pending.intent === "host";
+    if (!hasLocalIntent && !hasStateIntent) return false;
+
+    try {
+      const { token } = await travelerApi.sessionToken();
+      await ownerApi.exchange(token);
+      await ownerApi.enableHost(); 
+    } finally {
+      localStorage.removeItem(HOST_INTENT_KEY);
+    }
+    return true;
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
@@ -19,13 +36,26 @@ export default function Login() {
     try {
       await travelerApi.login({ email, password });
 
+      const wentHost = await completeHostFlowIfNeeded();
+      if (wentHost) {
+        navigate("/owner", { replace: true });
+        return;
+      }
+
       if (pending && pending.intent === "favorite" && pending.propertyId) {
         try { await travelerApi.addFavorite(Number(pending.propertyId)); } catch {}
         navigate(pending.from || "/", { replace: true });
         return;
       }
 
-      if (pending && pending.intent === "booking" && pending.propertyId && pending.startDate && pending.endDate && pending.guests) {
+      if (
+        pending &&
+        pending.intent === "booking" &&
+        pending.propertyId &&
+        pending.startDate &&
+        pending.endDate &&
+        pending.guests
+      ) {
         const url = `/booking-request?propertyId=${pending.propertyId}&startDate=${pending.startDate}&endDate=${pending.endDate}&guests=${pending.guests}`;
         navigate(url, { replace: true });
         return;
