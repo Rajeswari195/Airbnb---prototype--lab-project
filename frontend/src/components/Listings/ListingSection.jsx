@@ -25,11 +25,41 @@ export default function ListingSection({ filters }) {
   async function load() {
     setLoading(true);
     setErr("");
+
+    let base = [];
     try {
       const data = await travelerApi.listings(cleanedFilters);
-      setItems(Array.isArray(data) ? data : []);
+      base = Array.isArray(data) ? data : [];
     } catch (e) {
       setErr(e.message || "Failed to load listings");
+    }
+
+    try {
+      const withThumbs = await Promise.all(
+        base.map(async (it) => {
+          try {
+            const detail = await travelerApi.getProperty(it.id);
+            let photos = [];
+            if (detail && detail.photos) {
+              if (Array.isArray(detail.photos)) {
+                photos = detail.photos;
+              } else if (typeof detail.photos === "string") {
+                try {
+                  photos = JSON.parse(detail.photos || "[]");
+                } catch {
+                  photos = [];
+                }
+              }
+            }
+            return { ...it, _thumb: Array.isArray(photos) && photos.length ? photos[0] : null };
+          } catch {
+            return { ...it, _thumb: null };
+          }
+        })
+      );
+      setItems(withThumbs);
+    } catch {
+      setItems(base);
     } finally {
       setLoading(false);
     }
@@ -38,7 +68,7 @@ export default function ListingSection({ filters }) {
       const favs = await travelerApi.getFavorites();
       const map = {};
       (Array.isArray(favs) ? favs : []).forEach((f) => {
-        map[f.propertyId] = f.id; 
+        map[f.propertyId] = f.id;
       });
       setFavMap(map);
     } catch (_) {

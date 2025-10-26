@@ -7,8 +7,6 @@ export default function TravelerHome() {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState("");
-
-  // Filters actually sent to the backend (only when user hits Search)
   const [committed, setCommitted] = useState({
     location: undefined,
     startDate: undefined,

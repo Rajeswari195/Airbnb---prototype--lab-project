@@ -2,6 +2,16 @@ import "./ListingCard.css";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { travelerApi } from "../../services/api";
 
+const OWNER_API_BASE = process.env.REACT_APP_OWNER_API || "";
+
+function resolvePhoto(src) {
+  if (!src || typeof src !== "string") return null;
+  if (src.startsWith("/uploads/")) {
+    return `${OWNER_API_BASE}${src}`;
+  }
+  return src; 
+}
+
 export default function ListingCard({ item, isFavorite = false, onToggleFavorite }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -16,12 +26,21 @@ export default function ListingCard({ item, isFavorite = false, onToggleFavorite
   const baths = item.bathrooms != null ? Number(item.bathrooms) : null;
   const cap = item.capacity != null ? Number(item.capacity) : null;
 
+  let thumb = item._thumb || null;
+  if (!thumb && item.photos) {
+    try {
+      const arr = Array.isArray(item.photos) ? item.photos : JSON.parse(item.photos || "[]");
+      if (Array.isArray(arr) && arr.length) thumb = arr[0];
+    } catch {
+    }
+  }
+  const thumbSrc = resolvePhoto(thumb);
+
   async function handleHeartClick(e) {
     e.preventDefault();
     e.stopPropagation();
 
     if (typeof onToggleFavorite !== "function") return;
-
 
     try {
       await travelerApi.me();
@@ -42,9 +61,13 @@ export default function ListingCard({ item, isFavorite = false, onToggleFavorite
     <Link to={`/properties/${item.id}`} className="text-decoration-none text-reset">
       <div className="card listing-card h-100 shadow-sm">
         <div className="listing-thumb-wrap">
-          <div className="listing-thumb placeholder-wave">
-            <div className="placeholder w-100 h-100"></div>
-          </div>
+          {thumbSrc ? (
+            <img className="listing-thumb-img" src={thumbSrc} alt={title} />
+          ) : (
+            <div className="listing-thumb placeholder-wave">
+              <div className="placeholder w-100 h-100"></div>
+            </div>
+          )}
 
           {typeof onToggleFavorite === "function" && (
             <button
@@ -63,7 +86,7 @@ export default function ListingCard({ item, isFavorite = false, onToggleFavorite
           {type && <div className="text-muted small mb-1 text-truncate">{type}</div>}
           {locationLine && <div className="text-muted small text-truncate">{locationLine}</div>}
 
-          <div className="mt-2 small text-muted">
+        <div className="mt-2 small text-muted">
             {beds != null && <span className="me-2">{beds} bd</span>}
             {baths != null && <span className="me-2">{baths} ba</span>}
             {cap != null && <span className="me-2">{cap} guests</span>}

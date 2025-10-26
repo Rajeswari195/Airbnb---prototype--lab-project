@@ -31,6 +31,11 @@ export default function PropertyDetails() {
       try {
         setLoading(true);
         const data = await travelerApi.property(Number(id));
+        if (data && typeof data.photos === "string") {
+          try { data.photos = JSON.parse(data.photos); } catch { data.photos = []; }
+        }
+        if (!Array.isArray(data?.photos)) data.photos = [];
+
         if (!ignore) setP(data);
       } catch (e) {
         if (!ignore) setErr(e.message || "Failed to load property");
@@ -56,20 +61,6 @@ export default function PropertyDetails() {
       `/booking-request?propertyId=${Number(id)}&startDate=${checkIn}&endDate=${checkOut}&guests=${Number(guests) || 1}`
     );
   }
-
-  const photos = (() => {
-    const arr = Array.isArray(p?.photos) ? p.photos : [];
-    if (arr.length) return arr;
-
-    return [
-      "https://picsum.photos/1200/800?blur=1",
-      "https://picsum.photos/600/400?blur=2",
-      "https://picsum.photos/600/401?blur=2",
-      "https://picsum.photos/600/402?blur=2",
-      "https://picsum.photos/600/403?blur=2",
-      "https://picsum.photos/600/404?blur=2",
-    ];
-  })();
 
   if (loading) {
     return (
@@ -106,15 +97,14 @@ export default function PropertyDetails() {
       : priceNum != null
       ? `$${priceNum.toLocaleString()} night`
       : "";
-
   const todayISO = new Date().toISOString().slice(0, 10);
   const endMin = checkIn || todayISO;
-
-  const thumbsCount = Math.min(4, Math.max(0, photos.length - 1));
-  const thumbs = photos.slice(1, 1 + thumbsCount);
-  const showMoreButton = photos.length >= 5;
-  const primary = photos[0];
-
+  const photos = Array.isArray(p.photos) ? p.photos.filter(Boolean) : [];
+  const hasPhotos = photos.length > 0;
+  const thumbsCount = hasPhotos ? Math.min(4, Math.max(0, photos.length - 1)) : 0;
+  const thumbs = hasPhotos ? photos.slice(1, 1 + thumbsCount) : [];
+  const showMoreButton = hasPhotos && photos.length >= 5;
+  const primary = hasPhotos ? photos[0] : null;
   const galleryClass = thumbsCount === 0 ? "pd-gallery pd-gallery--single" : "pd-gallery";
   const rightGridClass = thumbsCount === 1 ? "pd-grid pd-grid--c1" : "pd-grid pd-grid--c2";
 
@@ -126,7 +116,6 @@ export default function PropertyDetails() {
         amenitiesList = arr.join(", ");
       }
     } catch {
-
     }
   }
 
@@ -134,53 +123,57 @@ export default function PropertyDetails() {
     <div className="container py-4">
       <h3 className="mb-3">{p.title}</h3>
 
-      <div className={galleryClass}>
-        <div className="pd-hero">
-          <img src={primary} alt="Primary" />
-        </div>
-
-        {thumbsCount > 0 && (
-          <div className={rightGridClass}>
-            {thumbs.map((src, i) => {
-              const isLastTile = showMoreButton && i === thumbs.length - 1;
-              return (
-                <div className="pd-thumb" key={i}>
-                  <img src={src} alt={`Photo ${i + 2}`} />
-                  {isLastTile && (
-                    <button
-                      type="button"
-                      className="pd-showmore-btn btn btn-light"
-                      onClick={() => setShowAll(true)}
-                    >
-                      <i className="bi bi-grid-3x3-gap me-2" />
-                      Show all photos
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {showAll && (
-        <div className="pd-lightbox" onClick={() => setShowAll(false)}>
-          <div className="pd-lightbox-inner" onClick={(e) => e.stopPropagation()}>
-            <button
-              className="btn btn-light pd-lightbox-close"
-              onClick={() => setShowAll(false)}
-            >
-              <i className="bi bi-x-lg" />
-            </button>
-            <div className="pd-lightbox-grid">
-              {photos.map((src, i) => (
-                <div key={i} className="pd-lightbox-item">
-                  <img src={src} alt={`Large ${i + 1}`} />
-                </div>
-              ))}
+      {hasPhotos && (
+        <>
+          <div className={galleryClass}>
+            <div className="pd-hero">
+              <img src={primary} alt="Primary" />
             </div>
+
+            {thumbsCount > 0 && (
+              <div className={rightGridClass}>
+                {thumbs.map((src, i) => {
+                  const isLastTile = showMoreButton && i === thumbs.length - 1;
+                  return (
+                    <div className="pd-thumb" key={i}>
+                      <img src={src} alt={`Photo ${i + 2}`} />
+                      {isLastTile && (
+                        <button
+                          type="button"
+                          className="pd-showmore-btn btn btn-light"
+                          onClick={() => setShowAll(true)}
+                        >
+                          <i className="bi bi-grid-3x3-gap me-2" />
+                          Show all photos
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
+
+          {showAll && (
+            <div className="pd-lightbox" onClick={() => setShowAll(false)}>
+              <div className="pd-lightbox-inner" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className="btn btn-light pd-lightbox-close"
+                  onClick={() => setShowAll(false)}
+                >
+                  <i className="bi bi-x-lg" />
+                </button>
+                <div className="pd-lightbox-grid">
+                  {photos.map((src, i) => (
+                    <div key={i} className="pd-lightbox-item">
+                      <img src={src} alt={`Large ${i + 1}`} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <div className="row mt-4">
