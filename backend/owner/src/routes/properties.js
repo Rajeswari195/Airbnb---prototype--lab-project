@@ -58,8 +58,10 @@ router.post('/', requireAuth, async (req, res, next) => {
 router.put('/:id', requireAuth, async (req, res, next) => {
   try {
     const pid = Number(req.params.id);
-    const p = await propSchema.fork(Object.keys(propSchema.describe().keys), (s)=>s.optional())
-                              .validateAsync(req.body, { abortEarly: false });
+    const p = await propSchema
+      .fork(Object.keys(propSchema.describe().keys), (s) => s.optional())
+      .validateAsync(req.body, { abortEarly: false });
+
     await pool.query(
       `UPDATE properties SET
          title=COALESCE(?,title), type=COALESCE(?,type), description=COALESCE(?,description),
@@ -104,12 +106,13 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const pid = Number(req.params.id);
     const [[p]] = await pool.query(
-      `SELECT id,title,type,description,amenities,price,address,city,bedrooms,bathrooms,capacity
+      `SELECT id,title,type,description,amenities,price,address,city,bedrooms,bathrooms,capacity,photos
          FROM properties WHERE id=? AND owner_id=?`,
       [pid, req.session.userId]
     );
     if (!p) return res.status(404).json({ error: 'Property not found' });
     if (typeof p.amenities === 'string') { try { p.amenities = JSON.parse(p.amenities); } catch { p.amenities = []; } }
+    if (typeof p.photos === 'string')  { try { p.photos = JSON.parse(p.photos); } catch { p.photos = []; } }
     res.json(p);
   } catch (e) { next(e); }
 });
@@ -117,8 +120,31 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 /** POST /api/properties/:id/photos (upload one photo) */
 router.post('/:id/photos', requireAuth, upload.single('file'), async (req, res, next) => {
   try {
+    const pid = Number(req.params.id);
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    res.json({ url: `/uploads/${req.file.filename}` });
+
+    const absoluteUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+
+    const [[row]] = await pool.query(
+      `SELECT photos FROM properties WHERE id=? AND owner_id=?`,
+      [pid, req.session.userId]
+    );
+    if (!row) return res.status(404).json({ error: 'Property not found' });
+
+    let photos = [];
+    if (row.photos) {
+      try { photos = typeof row.photos === 'string' ? JSON.parse(row.photos) : row.photos; }
+      catch { photos = []; }
+    }
+    photos = Array.isArray(photos) ? photos : [];
+    photos.push(absoluteUrl);
+
+    await pool.query(
+      `UPDATE properties SET photos=? WHERE id=? AND owner_id=?`,
+      [JSON.stringify(photos), pid, req.session.userId]
+    );
+
+    res.json({ url: absoluteUrl, photos });
   } catch (e) { next(e); }
 });
 

@@ -1,5 +1,4 @@
 // owner/src/db/pool.js
-
 import mysql from 'mysql2/promise';
 
 // Accept either DB_PASS or DB_PASSWORD
@@ -16,7 +15,6 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
-// Safe debug (no secrets)
 console.log('[Owner DB ENVs]', {
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,

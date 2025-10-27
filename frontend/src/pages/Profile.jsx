@@ -1,3 +1,4 @@
+// frontend/src/pages/Profile.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { travelerApi } from "../services/api";
@@ -57,6 +58,16 @@ export default function Profile() {
 
   const initial = String(me.name || me.email || "U").trim().charAt(0).toUpperCase();
 
+  // --- Avatar absolute URL fix ---
+  const TRAVELER_API = process.env.REACT_APP_TRAVELER_API || "";
+  const rawAvatar = me.avatarUrl || me.avatar_url || ""; // support either casing
+  const avatarSrc =
+    rawAvatar
+      ? (/^https?:\/\//i.test(rawAvatar)
+          ? rawAvatar
+          : `${TRAVELER_API}${rawAvatar.startsWith("/") ? rawAvatar : `/${rawAvatar}`}`)
+      : "";
+
   return (
     <div className="container py-4">
       <div className="profile-layout">
@@ -101,8 +112,8 @@ export default function Profile() {
             <>
               <div className="card profile-card shadow-sm mb-3">
                 <div className="card-body d-flex align-items-center flex-column py-4">
-                  {me.avatar_url ? (
-                    <img src={me.avatar_url} alt="avatar" className="profile-avatar-img" />
+                  {avatarSrc ? (
+                    <img src={avatarSrc} alt="avatar" className="profile-avatar-img" />
                   ) : (
                     <div className="profile-avatar">{initial}</div>
                   )}

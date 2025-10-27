@@ -39,13 +39,13 @@ router.get('/', async (req, res, next) => {
       params.push(`%${safeLocation}%`, `%${safeLocation}%`);
     }
 
-    // Exclude my own listings when logged in (so travelers don't see their own properties)
+    // Exclude own listings when logged in
     if (req.session?.userId) {
       where += ' AND (p.owner_id IS NULL OR p.owner_id <> ?)';
       params.push(req.session.userId);
     }
 
-    // Enforce capacity whenever guests is provided (works with or without dates)
+    // Enforce capacity whenever guests is provided works with or without dates
     if (guests && Number(guests) > 0) {
       where += ' AND p.capacity >= ?';
       params.push(safeGuests);
@@ -87,15 +87,20 @@ router.get('/:id', async (req, res, next) => {
     const pid = Number(req.params.id);
     const [[p]] = await pool.query(
       `SELECT p.id, p.title, p.type, p.description, p.amenities, p.price,
-              p.city, p.address, p.bedrooms, p.bathrooms, p.capacity
+              p.city, p.address, p.bedrooms, p.bathrooms, p.capacity,
+              p.photos
          FROM properties p
         WHERE p.id = ?`,
       [pid]
     );
     if (!p) return res.status(404).json({ error: 'Property not found' });
 
+    // Parse JSON columns if they came back as strings
     if (typeof p.amenities === 'string') {
       try { p.amenities = JSON.parse(p.amenities); } catch { p.amenities = []; }
+    }
+    if (typeof p.photos === 'string') {
+      try { p.photos = JSON.parse(p.photos); } catch { p.photos = []; }
     }
 
     res.json(p);

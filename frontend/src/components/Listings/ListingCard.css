@@ -6,35 +6,54 @@
 
 .listing-thumb-wrap {
   position: relative;
-  padding-top: 66.66%;
-  background: #f7f7f7;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  overflow: hidden;
+  background: #f3f3f3;
 }
 
 .listing-thumb {
-  position: absolute;
-  inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
-.listing-thumb.placeholder-wave .placeholder {
-  border-radius: 0;
+.listing-thumb-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;     
 }
 
 .wish-heart {
   position: absolute;
-  right: 10px;
   top: 10px;
-  background: #fff;
-  border: 0;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  box-shadow: 0 2px 10px rgba(0,0,0,.15);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  right: 10px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: #ffffffd9;
+  border: 1px solid #e6e6e6;
+  line-height: 1;
 }
-.wish-heart i { font-size: 18px; }
-.wish-heart--active i { color: #ff385c; }
+.wish-heart--active {
+  background: #fff1f4;
+  border-color: #ffd5de;
+}
+.wish-heart i {
+  font-size: 18px;
+}
+
+.listing-card .card-body {
+  padding: 12px 14px 14px;
+}
+
+.listing-card .text-truncate {
+  max-width: 100%;
+}
+
+@media (max-width: 576px) {
+  .listing-thumb-wrap {
+    aspect-ratio: 16 / 11;
+  }
+}
