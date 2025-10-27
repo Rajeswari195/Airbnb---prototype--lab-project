@@ -1,6 +1,9 @@
+// /frontend/src/pages/TravelerHome.jsx
 import "./TravelerHome.css";
 import { useState } from "react";
 import ListingSection from "../components/Listings/ListingSection";
+import AgentPanel from "../components/Agent/AgentPanel";
+import AgentFab from "../components/Agent/AgentFab";
 
 export default function TravelerHome() {
   const [location, setLocation] = useState("");
@@ -8,7 +11,6 @@ export default function TravelerHome() {
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState("");
 
-  // Filters actually sent to the backend (only when user hits Search)
   const [committed, setCommitted] = useState({
     location: undefined,
     startDate: undefined,
@@ -16,15 +18,15 @@ export default function TravelerHome() {
     guests: undefined,
   });
 
+  const [agentOpen, setAgentOpen] = useState(false);
+
   const submit = () => {
     let start = checkIn || undefined;
     let end = checkOut || undefined;
-
     if (start && end && new Date(end) < new Date(start)) {
       console.warn("End date must be after start date");
       return;
     }
-
     setCommitted({
       location: location || undefined,
       startDate: start,
@@ -94,6 +96,18 @@ export default function TravelerHome() {
       </div>
 
       <ListingSection filters={committed} />
+
+      {/* Agent UI */}
+      <AgentFab open={agentOpen} onOpen={() => setAgentOpen(true)} />
+      <AgentPanel
+        open={agentOpen}
+        onClose={() => setAgentOpen(false)}
+        defaults={{
+          location: committed.location || location,
+          startDate: committed.startDate || checkIn,
+          endDate: committed.endDate || checkOut,
+        }}
+      />
     </div>
   );
 }

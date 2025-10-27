@@ -1,40 +1,60 @@
+/* Container spacing */
+.container.py-4 {
+  position: relative; /* ensure stacking context for overlays if any */
+}
+
+/* Search bar pill */
 .search-bar {
   background: #fff;
-  border-radius: 40px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+  border-radius: 999px !important;
+  min-height: 64px;
 }
 
+/* Small “Where / Check-in / …” labels */
 .search-label {
+  display: block;
   font-size: 12px;
   font-weight: 600;
-  color: #6b6b6b;
-  display: block;
-  margin-bottom: 2px;
+  color: #6b7280; /* gray-500 */
+  margin-bottom: 4px;
 }
 
+/* Inputs inside pill (borderless) */
 .search-input {
-  font-size: 14px;
-  height: 32px;
   background: transparent;
+  font-size: 14px;
 }
 
-.search-bar input:focus {
-  outline: none !important;
-  box-shadow: none !important;
+.search-input:focus {
+  outline: none;
+  box-shadow: none;
 }
 
+/* Search icon button */
 .btn-search {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(90deg,#ff385c,#e61e4d);
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
   border: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  background: #ef4444; /* red-500 */
+  color: #fff;
+  transition: transform .08s ease, background .15s ease;
 }
 
-.btn-search i {
-  color: #fff;
-  font-size: 16px;
+.btn-search:hover { background: #dc2626; }  /* red-600 */
+.btn-search:active { transform: scale(0.98); }
+
+/* Make the pill wrap nicely on small screens */
+@media (max-width: 768px) {
+  .search-bar {
+    border-radius: 24px !important;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .search-bar .border-end {
+    border-right: 0 !important;
+  }
 }
