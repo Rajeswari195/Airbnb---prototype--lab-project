@@ -59,8 +59,8 @@ export default function BookingRequest() {
             startDate,
             endDate,
             guests,
-            from: `/booking-request?propertyId=${propertyId}&startDate=${startDate}&endDate=${endDate}&guests=${guests}`
-          }
+            from: `/booking-request?propertyId=${propertyId}&startDate=${startDate}&endDate=${endDate}&guests=${guests}`,
+          },
         });
         return;
       }
@@ -75,7 +75,9 @@ export default function BookingRequest() {
         if (!ignore) setLoading(false);
       }
     })();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, [propertyId, startDate, endDate, guests, navigate]);
 
   async function handleRequestToBook() {
@@ -100,6 +102,9 @@ export default function BookingRequest() {
 
   if (!meChecked) return null;
 
+  const displayStart = startDate ? startDate.slice(0, 10) : "";
+  const displayEnd = endDate ? endDate.slice(0, 10) : "";
+
   return (
     <div className="container py-4">
       <h3 className="mb-3">Request to book</h3>
@@ -114,30 +119,52 @@ export default function BookingRequest() {
 
               <div className="mb-3">
                 <label className="form-label">Name on card</label>
-                <input className="form-control" value={cardName} onChange={(e) => setCardName(e.target.value)} />
+                <input
+                  className="form-control"
+                  value={cardName}
+                  onChange={(e) => setCardName(e.target.value)}
+                />
               </div>
 
               <div className="mb-3">
                 <label className="form-label">Card number</label>
-                <input className="form-control" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} />
+                <input
+                  className="form-control"
+                  value={cardNumber}
+                  onChange={(e) => setCardNumber(e.target.value)}
+                />
               </div>
 
               <div className="row">
                 <div className="col-6 mb-3">
                   <label className="form-label">Expiration</label>
-                  <input className="form-control" placeholder="MM/YY" value={cardExpiry} onChange={(e) => setCardExpiry(e.target.value)} />
+                  <input
+                    className="form-control"
+                    placeholder="MM/YY"
+                    value={cardExpiry}
+                    onChange={(e) => setCardExpiry(e.target.value)}
+                  />
                 </div>
                 <div className="col-6 mb-3">
                   <label className="form-label">CVC</label>
-                  <input className="form-control" value={cardCvc} onChange={(e) => setCardCvc(e.target.value)} />
+                  <input
+                    className="form-control"
+                    value={cardCvc}
+                    onChange={(e) => setCardCvc(e.target.value)}
+                  />
                 </div>
               </div>
 
-              <button className="btn btn-danger btn-lg mt-2" onClick={handleRequestToBook}>
+              <button
+                className="btn btn-danger btn-lg mt-2"
+                onClick={handleRequestToBook}
+              >
                 Request to book
               </button>
 
-              <div className="small text-muted mt-2">You won’t be charged yet</div>
+              <div className="small text-muted mt-2">
+                You won’t be charged yet
+              </div>
             </div>
           </div>
         </div>
@@ -147,12 +174,21 @@ export default function BookingRequest() {
             <div className="card-body">
               {loading ? (
                 <div className="placeholder-glow">
-                  <span className="placeholder col-6" /> <span className="placeholder col-4" />
+                  <span className="placeholder col-6" />{" "}
+                  <span className="placeholder col-4" />
                 </div>
               ) : p ? (
                 <>
                   <div className="d-flex align-items-start">
-                    <div style={{ width: 90, height: 70, borderRadius: 8, background: "#f3f3f3" }} className="me-3" />
+                    <div
+                      style={{
+                        width: 90,
+                        height: 70,
+                        borderRadius: 8,
+                        background: "#f3f3f3",
+                      }}
+                      className="me-3"
+                    />
                     <div>
                       <div className="fw-semibold">{p.title}</div>
                       <div className="text-muted small">{p.city}</div>
@@ -162,9 +198,15 @@ export default function BookingRequest() {
                   <hr />
 
                   <div className="small">
-                    <div><strong>Dates:</strong> {startDate} → {endDate}</div>
-                    <div><strong>Guests:</strong> {guests}</div>
-                    <div><strong>Nights:</strong> {nights}</div>
+                    <div>
+                      <strong>Dates:</strong> {displayStart} → {displayEnd}
+                    </div>
+                    <div>
+                      <strong>Guests:</strong> {guests}
+                    </div>
+                    <div>
+                      <strong>Nights:</strong> {nights}
+                    </div>
                   </div>
 
                   <hr />
@@ -172,12 +214,19 @@ export default function BookingRequest() {
                   {typeof p.price !== "undefined" && (
                     <div className="small">
                       <div className="d-flex justify-content-between">
-                        <span>${Number(p.price)} × {nights} night{nights !== 1 ? "s" : ""}</span>
-                        <span>${(Number(p.price) * nights || 0).toLocaleString()}</span>
+                        <span>
+                          ${Number(p.price)} × {nights} night
+                          {nights !== 1 ? "s" : ""}
+                        </span>
+                        <span>
+                          ${(Number(p.price) * nights || 0).toLocaleString()}
+                        </span>
                       </div>
                       <div className="d-flex justify-content-between mt-2 fw-semibold">
                         <span>Total</span>
-                        <span>${(Number(p.price) * nights || 0).toLocaleString()}</span>
+                        <span>
+                          ${(Number(p.price) * nights || 0).toLocaleString()}
+                        </span>
                       </div>
                     </div>
                   )}

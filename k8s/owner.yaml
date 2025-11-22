@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: owner-deployment
+  labels:
+    app: owner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: owner
+  template:
+    metadata:
+      labels:
+        app: owner
+    spec:
+      containers:
+        - name: owner
+          image: owner-service:lab2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8001
+          env:
+            # ---- MySQL config ----
+            - name: DB_HOST
+              value: "host.docker.internal"
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_USER
+              value: "airbnb_user"
+            - name: DB_NAME
+              value: "airbnb_app"
+            # uncomment if you actually use a password in owner service
+            # - name: DB_PASSWORD
+            #   value: "YourStrong#Pass123"
+
+            # ---- Mongo config ----
+            - name: MONGO_URL
+              value: "mongodb://mongo.airbnb-lab2.svc.cluster.local:27017/airbnb"
+            - name: MONGO_URI
+              value: "mongodb://mongo.airbnb-lab2.svc.cluster.local:27017/airbnb"
+
+            # ---- Kafka config ----
+            - name: KAFKA_CLIENT_ID
+              value: "owner-service"
+            - name: KAFKA_BROKERS
+              value: "kafka.airbnb-lab2.svc.cluster.local:9092"
+
+            # Topic that owner CONSUMES from (created by booking service)
+            - name: BOOKING_TOPIC
+              value: "booking-events"
+
+            # Topic that owner PRODUCES status updates to
+            - name: BOOKING_STATUS_TOPIC
+              value: "booking-status-events"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: owner-service
+  labels:
+    app: owner
+spec:
+  selector:
+    app: owner
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8001
+      targetPort: 8001
+  type: ClusterIP

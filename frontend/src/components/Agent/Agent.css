@@ -8,7 +8,7 @@
   height: 56px;
   border-radius: 50%;
   border: none;
-  background: #0d6efd;              /* bootstrap primary */
+  background: #ff5a5f;              /* Airbnb coral */
   color: #fff;
   box-shadow: 0 10px 25px rgba(0,0,0,.18);
   display: grid;
@@ -19,7 +19,7 @@
 .agent-fab:hover {
   transform: translateY(-1px);
   box-shadow: 0 14px 28px rgba(0,0,0,.22);
-  background: #0b5ed7;
+  background: #e5484d;              /* darker coral on hover */
 }
 
 /* ===== Slide-in Panel (right side) ===== */

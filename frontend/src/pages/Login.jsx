@@ -109,27 +109,7 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="auth-or">
-          <span>or</span>
-        </div>
-
-        <div className="d-grid gap-2">
-          <button className="btn btn-outline-dark btn-lg" type="button">
-            <i className="bi bi-google me-2"></i> Continue with Google
-          </button>
-          <button className="btn btn-outline-dark btn-lg" type="button">
-            <i className="bi bi-apple me-2"></i> Continue with Apple
-          </button>
-          <button
-            className="btn btn-outline-dark btn-lg"
-            type="button"
-            onClick={() => navigate("/signup", { state: pending })}
-          >
-            <i className="bi bi-envelope me-2"></i> Create an account
-          </button>
-        </div>
-
-        <div className="auth-footer mt-3">
+        <div className="auth-footer mt-4">
           New here? <Link to="/signup" state={pending}>Create an account</Link>
         </div>
       </div>

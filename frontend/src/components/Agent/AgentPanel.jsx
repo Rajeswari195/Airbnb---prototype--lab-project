@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "./Agent.css";
+import { travelerApi } from "../../services/api";
 
 /**
  * Props:
@@ -15,8 +16,8 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
 
   // form state
   const [location, setLocation] = useState(defaults.location || "");
-  const [start, setStart] = useState(defaults.startDate || "");
-  const [end, setEnd] = useState(defaults.endDate || "");
+  const [start, setStart] = useState(trimDate(defaults.startDate));
+  const [end, setEnd] = useState(trimDate(defaults.endDate));
   const [adults, setAdults] = useState(String(defaults.guests || 2));
   const [kids, setKids] = useState("0");
   const [partyType, setPartyType] = useState("couple");
@@ -33,21 +34,65 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
   const [err, setErr] = useState("");
   const [plan, setPlan] = useState(null);
 
+  // reset from defaults when panel opens
   useEffect(() => {
     if (open) {
       setLocation(defaults.location || "");
-      setStart(defaults.startDate || "");
-      setEnd(defaults.endDate || "");
+      setStart(trimDate(defaults.startDate));
+      setEnd(trimDate(defaults.endDate));
       if (defaults.guests) setAdults(String(defaults.guests));
       setErr("");
     }
   }, [open, defaults]);
 
-  const dateLine = useMemo(() => {
-    if (!plan?.meta?.dates?.length) return "— → —";
-    const d = plan.meta.dates;
-    return `${d[0]} → ${d[d.length - 1]}`;
-  }, [plan]);
+  // auto-fill from traveler's upcoming accepted booking
+  useEffect(() => {
+    if (!open) return;
+
+    (async () => {
+      try {
+        const all = await travelerApi.listBookings();
+        if (!Array.isArray(all) || !all.length) return;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const futureAccepted = all.filter((b) => {
+          if (b.status !== "Accepted" || !b.startDate) return false;
+          const d = new Date(b.startDate);
+          d.setHours(0, 0, 0, 0);
+          return d >= today;
+        });
+
+        if (!futureAccepted.length) return;
+
+        futureAccepted.sort(
+          (a, b) => new Date(a.startDate) - new Date(b.startDate)
+        );
+        const next = futureAccepted[0];
+
+        setLocation(
+          (prev) =>
+            next.city || next.title || prev || defaults.location || ""
+        );
+        if (next.startDate) setStart(trimDate(next.startDate));
+        if (next.endDate) setEnd(trimDate(next.endDate));
+        if (next.guests != null) setAdults(String(next.guests));
+      } catch (e) {
+        console.warn(
+          "Failed to prefill AI agent from upcoming booking",
+          e
+        );
+      }
+    })();
+  }, [open, defaults.location]);
+
+  const uiDateLine = useMemo(() => {
+    const s = trimDate(start);
+    const e = trimDate(end);
+    if (!s && !e) return "— → —";
+    return `${s || "—"} → ${e || "—"}`;
+  }, [start, end]);
 
   async function generate() {
     setErr("");
@@ -98,7 +143,6 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
       const data = await res.json();
       setPlan(data);
 
-      // scroll to top of result area
       requestAnimationFrame(() => {
         const root = document.querySelector(".agent-panel .agent-body");
         if (root) root.scrollTo({ top: 0, behavior: "smooth" });
@@ -116,11 +160,11 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
         <div>
           <div className="agent-title">Trip Plan</div>
           <div className="agent-sub text-muted small">
-            Location:{" "}
+            Using:{" "}
             <span className="fw-semibold">
-              {plan?.meta?.location || "(not set)"}
+              {location || "(no upcoming trip found)"}
             </span>{" "}
-            · Dates: <span className="fw-semibold">{dateLine}</span>
+            · Dates: <span className="fw-semibold">{uiDateLine}</span>
           </div>
         </div>
         <button className="btn btn-light" onClick={onClose}>
@@ -222,7 +266,8 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
 
               <div className="col-12">
                 <label className="form-label">
-                  Interests <span className="text-muted">(comma-separated)</span>
+                  Interests{" "}
+                  <span className="text-muted">(comma-separated)</span>
                 </label>
                 <input
                   className="form-control"
@@ -234,7 +279,8 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
 
               <div className="col-12">
                 <label className="form-label">
-                  Dietary <span className="text-muted">(comma-separated)</span>
+                  Dietary{" "}
+                  <span className="text-muted">(comma-separated)</span>
                 </label>
                 <input
                   className="form-control"
@@ -285,7 +331,10 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
         {plan && (
           <>
             <div className="text-muted small mb-2">
-              Source: <span className="fw-semibold">{plan.source || "fallback"}</span>
+              Source:{" "}
+              <span className="fw-semibold">
+                {plan.source || "fallback"}
+              </span>
             </div>
 
             <h5 className="mb-2">Itinerary</h5>
@@ -306,16 +355,26 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
                 <div className="card-body">
                   <div className="d-flex justify-content-between">
                     <div className="fw-semibold">{a.title}</div>
-                    {a.when && <span className="badge bg-light text-dark">{a.when}</span>}
+                    {a.when && (
+                      <span className="badge bg-light text-dark">
+                        {a.when}
+                      </span>
+                    )}
                   </div>
                   <div className="text-muted small">
                     {a.address}
                     {a.geo ? (
-                      <> · ({Number(a.geo.lat).toFixed(3)}, {Number(a.geo.lon).toFixed(3)})</>
+                      <>
+                        {" "}
+                        · ({Number(a.geo.lat).toFixed(3)},{" "}
+                        {Number(a.geo.lon).toFixed(3)})
+                      </>
                     ) : null}
                   </div>
                   <div className="small mt-2">
-                    <span className="badge bg-light text-dark me-1">{a.priceTier || "—"}</span>
+                    <span className="badge bg-light text-dark me-1">
+                      {a.priceTier || "—"}
+                    </span>
                     {a.durationMins != null && (
                       <span className="badge bg-light text-dark me-1">
                         {a.durationMins} mins
@@ -323,15 +382,22 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
                     )}
                     {Array.isArray(a.tags) &&
                       a.tags.map((t, j) => (
-                        <span key={j} className="badge bg-secondary me-1">
+                        <span
+                          key={j}
+                          className="badge bg-secondary me-1"
+                        >
                           {t}
                         </span>
                       ))}
                     {a.wheelchairFriendly && (
-                      <span className="badge bg-success me-1">wheelchair</span>
+                      <span className="badge bg-success me-1">
+                        wheelchair
+                      </span>
                     )}
                     {a.childFriendly && (
-                      <span className="badge bg-success">kids</span>
+                      <span className="badge bg-success">
+                        kids
+                      </span>
                     )}
                   </div>
                 </div>
@@ -345,13 +411,19 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
                   <div className="fw-semibold">{r.name}</div>
                   <div className="text-muted small">{r.address}</div>
                   <div className="small mt-1">
-                    {r.dietTags?.length ? r.dietTags.join(", ") : "dietary: —"} ·{" "}
-                    {r.priceTier || "—"}
+                    {r.dietTags?.length
+                      ? r.dietTags.join(", ")
+                      : "dietary: —"}{" "}
+                    · {r.priceTier || "—"}
                     {r.url && (
                       <>
                         {" "}
                         ·{" "}
-                        <a href={r.url} target="_blank" rel="noreferrer">
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
                           link
                         </a>
                       </>
@@ -380,7 +452,9 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
         >
           {loading ? "Generating…" : "Generate plan"}
         </button>
-        {err && <div className="alert alert-danger mt-2 mb-0">{err}</div>}
+        {err && (
+          <div className="alert alert-danger mt-2 mb-0">{err}</div>
+        )}
       </div>
     </div>
   );
@@ -391,4 +465,10 @@ function splitCSV(s) {
     .split(",")
     .map((x) => x.trim())
     .filter(Boolean);
+}
+
+function trimDate(value) {
+  if (!value) return "";
+  const s = String(value);
+  return s.slice(0, 10);
 }

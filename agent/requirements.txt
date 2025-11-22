@@ -3,5 +3,5 @@ uvicorn[standard]
 python-dotenv
 pydantic>=2
 requests
-openai>=1.40.0 
-tavily-python   
+tavily-python 
+google-generativeai  

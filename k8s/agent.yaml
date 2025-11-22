@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-deployment
+  labels:
+    app: agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent
+  template:
+    metadata:
+      labels:
+        app: agent
+    spec:
+      containers:
+        - name: agent-container
+          image: agent-service:lab2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8500
+          env:
+            - name: AGENT_PORT
+              value: "8500"
+
+            # Kafka wiring – talk to Kafka in airbnb-lab2 namespace
+            - name: KAFKA_BROKERS
+              value: "kafka.airbnb-lab2:9092"
+            - name: BOOKING_TOPIC
+              value: "booking-events"
+            - name: BOOKING_CONSUMER_GROUP
+              value: "agent-service-group"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-service
+  labels:
+    app: agent
+spec:
+  selector:
+    app: agent
+  ports:
+    - name: http
+      port: 8500
+      targetPort: 8500
+  type: ClusterIP

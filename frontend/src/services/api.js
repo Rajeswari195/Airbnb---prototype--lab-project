@@ -61,11 +61,25 @@ export const travelerApi = {
     request(TRAVELER_API, `/api/favorites/${favoriteId}`, { method: "DELETE" }),
 
   createBooking: (body) =>
-    request(TRAVELER_API, "/api/bookings", { method: "POST", body: JSON.stringify(body) }),
+    request(TRAVELER_API, "/api/bookings", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   listBookings: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return request(TRAVELER_API, `/api/bookings${qs ? `?${qs}` : ""}`);
+    return request(
+      TRAVELER_API,
+      `/api/bookings${qs ? `?${qs}` : ""}`
+    );
   },
+
+  updateBooking: (id, body) =>
+    request(TRAVELER_API, `/api/bookings/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
   cancelBooking: (id) =>
     request(TRAVELER_API, `/api/bookings/${id}/cancel`, { method: "POST" }),
 };

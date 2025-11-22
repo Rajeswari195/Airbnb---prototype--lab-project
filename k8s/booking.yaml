@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking-deployment
+  labels:
+    app: booking
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: booking
+  template:
+    metadata:
+      labels:
+        app: booking
+    spec:
+      containers:
+        - name: booking-container
+          image: booking-service:lab2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8003
+          env:
+            # ---- Mongo inside Kubernetes ----
+            - name: MONGODB_URI
+              value: "mongodb://mongo.airbnb-lab2.svc.cluster.local:27017/airbnb"
+
+            # ---- Kafka wiring – producer side ----
+            # Keep both vars so whatever your client uses will work.
+            - name: KAFKA_BROKER
+              value: "kafka.airbnb-lab2.svc.cluster.local:9092"
+            - name: KAFKA_BROKERS
+              value: "kafka.airbnb-lab2.svc.cluster.local:9092"
+            - name: BOOKING_TOPIC
+              value: "booking-events"
+
+            # ---- MySQL still on your Mac ----
+            - name: DB_HOST
+              value: "host.docker.internal"
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_USER
+              value: "airbnb_user"
+            - name: DB_PASSWORD
+              value: "YourStrong#Pass123"
+            - name: DB_NAME
+              value: "airbnb_app"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: booking-service
+  labels:
+    app: booking
+spec:
+  selector:
+    app: booking
+  ports:
+    - name: http
+      port: 8003
+      targetPort: 8003
+  type: ClusterIP

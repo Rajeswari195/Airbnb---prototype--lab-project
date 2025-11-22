@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traveler-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traveler
+  template:
+    metadata:
+      labels:
+        app: traveler
+    spec:
+      containers:
+        - name: traveler-container
+          image: traveler-service:lab2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            # MySQL on your Mac
+            - name: DB_HOST
+              value: "host.docker.internal"
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_USER
+              value: "airbnb_user"
+            - name: DB_PASSWORD
+              value: "YourStrong#Pass123"
+            - name: DB_NAME
+              value: "airbnb_app"
+
+            # Mongo inside cluster
+            - name: MONGODB_URI
+              value: "mongodb://mongo:27017/airbnb"
+
+            # Kafka status consumer config
+            - name: KAFKA_CLIENT_ID
+              value: "traveler-service"
+            - name: KAFKA_BROKERS
+              value: "kafka.airbnb-lab2.svc.cluster.local:9092"
+            - name: BOOKING_STATUS_TOPIC
+              value: "booking-status-events"

@@ -7,7 +7,6 @@ export default function ListingSection({ filters }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-
   const [favMap, setFavMap] = useState({});
 
   const cleanedFilters = useMemo(() => {
@@ -51,7 +50,10 @@ export default function ListingSection({ filters }) {
                 }
               }
             }
-            return { ...it, _thumb: Array.isArray(photos) && photos.length ? photos[0] : null };
+            return {
+              ...it,
+              _thumb: Array.isArray(photos) && photos.length ? photos[0] : null,
+            };
           } catch {
             return { ...it, _thumb: null };
           }
@@ -71,7 +73,7 @@ export default function ListingSection({ filters }) {
         map[f.propertyId] = f.id;
       });
       setFavMap(map);
-    } catch (_) {
+    } catch {
       setFavMap({});
     }
   }
@@ -94,7 +96,9 @@ export default function ListingSection({ filters }) {
         await travelerApi.addFavorite(propertyId);
         const favs = await travelerApi.getFavorites();
         const map = {};
-        (Array.isArray(favs) ? favs : []).forEach((f) => (map[f.propertyId] = f.id));
+        (Array.isArray(favs) ? favs : []).forEach(
+          (f) => (map[f.propertyId] = f.id)
+        );
         setFavMap(map);
       }
     } catch (e) {
@@ -131,15 +135,17 @@ export default function ListingSection({ filters }) {
                 </div>
               </div>
             ))
-          : items.map((it) => (
-              <div key={it.id} className="col">
-                <ListingCard
-                  item={it}
-                  isFavorite={!!favMap[it.id]}
-                  onToggleFavorite={toggleFavorite}
-                />
-              </div>
-            ))}
+          : items
+              .filter((it) => it._thumb) // Only include listings with a thumbnail
+              .map((it) => (
+                <div key={it.id} className="col">
+                  <ListingCard
+                    item={it}
+                    isFavorite={!!favMap[it.id]}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                </div>
+              ))}
       </div>
     </section>
   );

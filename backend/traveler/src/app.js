@@ -1,11 +1,16 @@
+// backend/traveler/src/app.js
 import 'dotenv/config';
 import express from 'express';
 import session from 'express-session';
+import MongoStore from 'connect-mongo';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import swaggerUi from 'swagger-ui-express';
+
+// Use shared Mongo URI config (this reads MONGO_URL or falls back to localhost)
+import { mongoUri } from './config/mongo.js';
 
 // ---- Routes ----
 import healthRoutes from './routes/health.js';
@@ -25,26 +30,38 @@ app.use(express.urlencoded({ extended: true }));
 const allowed = [
   process.env.CORS_ORIGIN || 'http://localhost:5173',
   'http://localhost:3000',
-  `http://localhost:${process.env.PORT || 8000}`
+  `http://localhost:${process.env.PORT || 8000}`,
 ];
-app.use(cors({
-  origin: (origin, cb) => cb(null, !origin || allowed.includes(origin)),
-  credentials: true
-}));
 
-// ---- Sessions ----
-app.use(session({
-  name: 'sid',
-  secret: process.env.SESSION_SECRET || 'dev_fallback_secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-  }
-}));
+app.use(
+  cors({
+    origin: (origin, cb) => cb(null, !origin || allowed.includes(origin)),
+    credentials: true,
+  })
+);
+
+// ---- Sessions (stored in MongoDB) ----
+const sessionSecret = process.env.SESSION_SECRET || 'dev_fallback_secret';
+
+app.use(
+  session({
+    name: 'sid',
+    secret: sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+      // 🔴 key change: use the same mongoUri used by mongoose
+      mongoUrl: mongoUri,
+      collectionName: 'sessions',
+    }),
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    },
+  })
+);
 
 // ---- Static /uploads ----
 const __filename = fileURLToPath(import.meta.url);
@@ -63,9 +80,13 @@ app.use('/api/favorites', favoritesRoutes);
 const openapiPath = path.resolve(__dirname, 'openapi.json');
 if (fs.existsSync(openapiPath)) {
   const swaggerDoc = JSON.parse(fs.readFileSync(openapiPath, 'utf-8'));
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc, {
-    swaggerOptions: { withCredentials: true }
-  }));
+  app.use(
+    '/api-docs',
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerDoc, {
+      swaggerOptions: { withCredentials: true },
+    })
+  );
 } else {
   console.warn('[Swagger] openapi.json not found; /api-docs disabled');
 }
@@ -77,15 +98,19 @@ app.use((err, _req, res, _next) => {
     return res.status(409).json({ error: 'Duplicate entry' });
   }
   if (err && err.isJoi) {
-    return res.status(400).json({ error: 'Validation failed', details: err.details });
+    return res
+      .status(400)
+      .json({ error: 'Validation failed', details: err.details });
   }
   res.status(err.status || 500).json({ error: err.message || 'Server error' });
 });
 
-// ---- Start server ----
-const port = Number(process.env.PORT || 8000);
-app.listen(port, () => {
-  console.log(`Server listening on :${port}`);
+// ---- Debug whoami ----
+app.get('/__whoami', (_req, res) => {
+  res.json({
+    service: 'traveler-mongo',
+    time: new Date().toISOString(),
+  });
 });
 
 export default app;
