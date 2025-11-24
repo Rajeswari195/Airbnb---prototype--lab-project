@@ -21,7 +21,7 @@ spec:
           env:
             # MySQL on your Mac
             - name: DB_HOST
-              value: "host.docker.internal"
+              value: "mysql"
             - name: DB_PORT
               value: "3306"
             - name: DB_USER

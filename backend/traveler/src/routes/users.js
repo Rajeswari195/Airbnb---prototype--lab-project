@@ -1,10 +1,13 @@
+// backend/traveler/src/routes/users.js
 import { Router } from 'express';
-import pool from '../db/pool.js';
-import requireAuth from '../middleware/auth.js';
 import multer from 'multer';
 import path from 'path';
 import Joi from 'joi';
 import { fileURLToPath } from 'url';
+
+import requireAuth from '../middleware/auth.js';
+import User from '../models/User.js';   // 🔹 Mongo traveler profile
+import pool from '../db/pool.js';       // 🔹 MySQL pool (for role/source of truth)
 
 const router = Router();
 
@@ -39,61 +42,128 @@ const profileSchema = Joi.object({
   gender: Joi.string().valid('Female', 'Male', 'Non-binary', 'Prefer not to say', '').allow(''),
 });
 
-/** GET /api/users/me */
+/**
+ * Helper: get role from MySQL by email (source of truth for owner/traveler).
+ * If anything fails, it returns null and we fall back to Mongo's role.
+ */
+async function getRoleFromMySQL(email) {
+  if (!email) return null;
+  try {
+    const [rows] = await pool.query(
+      'SELECT role FROM users WHERE email = ? LIMIT 1',
+      [email]
+    );
+    if (rows.length && rows[0].role) {
+      return rows[0].role;
+    }
+  } catch (err) {
+    console.error('[Traveler users] Failed to read role from MySQL:', err.message);
+  }
+  return null;
+}
+
+/**
+ * GET /api/users/me
+ * 🔹 Reads traveler profile from MongoDB User document.
+ * 🔹 Role is resolved from MySQL if possible (so owner-role flip is visible in UI).
+ */
 router.get('/me', requireAuth, async (req, res, next) => {
   try {
     const uid = req.session.userId;
-    const [rows] = await pool.query(
-      `SELECT id, name, email, phone, about, city, state, country, languages, gender,
-              avatar_url AS avatarUrl,
-              role
-         FROM users
-        WHERE id = ?`,
-      [uid]
-    );
-    if (!rows.length) return res.status(404).json({ error: 'User not found' });
-    const u = rows[0];
-    if (typeof u.languages === 'string') {
-      try { u.languages = JSON.parse(u.languages); } catch { u.languages = []; }
+
+    const user = await User.findById(uid).lean();
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
-    res.json(u);
+
+    // Prefer MySQL role (where /api/host/enable updates role to 'owner')
+    let role = user.role || 'traveler';
+    const mysqlRole = await getRoleFromMySQL(user.email);
+    if (mysqlRole) {
+      role = mysqlRole;
+    }
+
+    const payload = {
+      id: String(user._id),
+      name: user.name || '',
+      email: user.email,
+      phone: user.phone || '',
+      about: user.about || '',
+      city: user.city || '',
+      state: user.state || '',
+      country: user.country || '',
+      languages: Array.isArray(user.languages) ? user.languages : [],
+      gender: user.gender || '',
+      avatarUrl: user.avatarUrl || '',
+      role,
+    };
+
+    return res.json(payload);
   } catch (err) {
-    next(err);
+    return next(err);
   }
 });
 
-/** PUT /api/users/me */
+/**
+ * PUT /api/users/me
+ * 🔹 Updates profile fields in MongoDB User document.
+ *    Returns the updated profile object (same shape as GET /me).
+ */
 router.put('/me', requireAuth, async (req, res, next) => {
   try {
     const uid = req.session.userId;
     const payload = await profileSchema.validateAsync(req.body, { abortEarly: false });
 
-    const langsText = JSON.stringify(payload.languages || []);
+    const update = {
+      name: payload.name,
+      email: payload.email,
+      phone: payload.phone || '',
+      about: payload.about || '',
+      city: payload.city || '',
+      state: payload.state || '',
+      country: payload.country || '',
+      languages: payload.languages || [],
+      gender: payload.gender || '',
+    };
 
-    await pool.query(
-      `UPDATE users
-         SET name=?, email=?, phone=?, about=?, city=?, state=?, country=?, languages=?, gender=?
-       WHERE id=?`,
-      [
-        payload.name,
-        payload.email,
-        payload.phone || '',
-        payload.about || '',
-        payload.city || '',
-        payload.state || '',
-        payload.country || '',
-        langsText,
-        payload.gender || '',
-        uid
-      ]
-    );
+    const user = await User.findByIdAndUpdate(uid, update, {
+      new: true,
+      runValidators: false,
+    }).lean();
 
-    return res.json({ ok: true });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Again, resolve latest role from MySQL if present
+    let role = user.role || 'traveler';
+    const mysqlRole = await getRoleFromMySQL(user.email);
+    if (mysqlRole) {
+      role = mysqlRole;
+    }
+
+    const response = {
+      id: String(user._id),
+      name: user.name || '',
+      email: user.email,
+      phone: user.phone || '',
+      about: user.about || '',
+      city: user.city || '',
+      state: user.state || '',
+      country: user.country || '',
+      languages: Array.isArray(user.languages) ? user.languages : [],
+      gender: user.gender || '',
+      avatarUrl: user.avatarUrl || '',
+      role,
+    };
+
+    return res.json(response);
   } catch (err) {
-    if (err && err.code === 'ER_DUP_ENTRY') {
+    // Duplicate email
+    if (err && err.code === 11000) {
       return res.status(409).json({ error: 'Email already in use' });
     }
-    // Validation errors
+    // Joi validation errors
     if (err && err.isJoi) {
       return res.status(400).json({ error: 'Validation failed', details: err.details });
     }
@@ -101,15 +171,21 @@ router.put('/me', requireAuth, async (req, res, next) => {
   }
 });
 
-/** POST /api/users/me/avatar (multipart/form-data with "file") */
+/**
+ * POST /api/users/me/avatar
+ * 🔹 Saves avatar file to disk and stores URL path in Mongo User document.
+ */
 router.post('/me/avatar', requireAuth, upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
     const urlPath = `/uploads/${req.file.filename}`;
-    await pool.query('UPDATE users SET avatar_url = ? WHERE id = ?', [urlPath, req.session.userId]);
-    res.json({ avatarUrl: urlPath });
+
+    await User.findByIdAndUpdate(req.session.userId, { avatarUrl: urlPath });
+
+    return res.json({ avatarUrl: urlPath });
   } catch (err) {
-    next(err);
+    return next(err);
   }
 });
 

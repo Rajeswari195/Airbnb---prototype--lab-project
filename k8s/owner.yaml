@@ -23,22 +23,21 @@ spec:
           env:
             # ---- MySQL config ----
             - name: DB_HOST
-              value: "host.docker.internal"
+              value: "mysql"
             - name: DB_PORT
               value: "3306"
             - name: DB_USER
               value: "airbnb_user"
             - name: DB_NAME
               value: "airbnb_app"
-            # uncomment if you actually use a password in owner service
-            # - name: DB_PASSWORD
-            #   value: "YourStrong#Pass123"
+            - name: DB_PASSWORD
+              value: "YourStrong#Pass123"
 
             # ---- Mongo config ----
             - name: MONGO_URL
-              value: "mongodb://mongo.airbnb-lab2.svc.cluster.local:27017/airbnb"
+              value: "mongodb://mongo:27017/airbnb"
             - name: MONGO_URI
-              value: "mongodb://mongo.airbnb-lab2.svc.cluster.local:27017/airbnb"
+              value: "mongodb://mongo:27017/airbnb"
 
             # ---- Kafka config ----
             - name: KAFKA_CLIENT_ID

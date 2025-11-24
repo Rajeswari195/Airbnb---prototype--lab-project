@@ -5,7 +5,7 @@ export const mongoUri =
   process.env.MONGODB_URI ||  // preferred (we set this in k8s)
   process.env.MONGO_URI ||
   process.env.MONGO_URL ||
-  'mongodb://mongo.airbnb-lab2.svc.cluster.local:27017/airbnb'; // cluster default
+  'mongodb://mongo:27017/airbnb'; // cluster default
 
 export const connectMongoOwner = async () => {
   try {

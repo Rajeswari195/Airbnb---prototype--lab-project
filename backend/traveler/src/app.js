@@ -9,8 +9,8 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import swaggerUi from 'swagger-ui-express';
 
-// Use shared Mongo URI config (this reads MONGO_URL or falls back to localhost)
-import { mongoUri } from './config/mongo.js';
+// Use shared Mongo URI config + connector
+import { mongoUri, connectMongoTraveler } from './config/mongo.js';
 
 // ---- Routes ----
 import healthRoutes from './routes/health.js';
@@ -21,6 +21,16 @@ import bookingRoutes from './routes/bookings.js';
 import favoritesRoutes from './routes/favorites.js';
 
 const app = express();
+
+// ---- CONNECT TO MONGO FIRST ----
+connectMongoTraveler()
+  .then(() => {
+    console.log('🟢 Traveler Mongo connected BEFORE app middleware');
+  })
+  .catch((err) => {
+    console.error('🔴 Traveler Mongo failed to connect:', err);
+    process.exit(1);
+  });
 
 // ---- Parsers ----
 app.use(express.json());
@@ -50,7 +60,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
-      // 🔴 key change: use the same mongoUri used by mongoose
+      // use the same mongo URI that mongoose connects to
       mongoUrl: mongoUri,
       collectionName: 'sessions',
     }),

@@ -5,12 +5,45 @@ import jwt from 'jsonwebtoken';
 
 import User from '../models/User.js';
 import requireAuth from '../middleware/auth.js';
+import pool from '../db/pool.js';            // 👈 NEW: MySQL pool
 
 const router = Router();
 
 /**
+ * Helper: create or update a MySQL profile row for this traveler.
+ * - id is the Mongo _id string
+ * - keeps email/name in sync
+ */
+async function syncTravelerProfileToMySQL(mongoUser) {
+  const uid = String(mongoUser._id);
+  const name = mongoUser.name || '';
+  const email = mongoUser.email;
+  const role = mongoUser.role || 'traveler';
+
+  try {
+    // Use ON DUPLICATE KEY so this works for both signup and re-signup cases
+    await pool.query(
+      `
+      INSERT INTO users (id, name, email, role)
+      VALUES (?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        name = VALUES(name),
+        email = VALUES(email),
+        role = VALUES(role)
+      `,
+      [uid, name, email, role]
+    );
+    console.log('>>> [AUTH] MySQL profile synced for traveler id =', uid);
+  } catch (err) {
+    console.error('>>> [AUTH] MySQL sync error:', err);
+    // IMPORTANT: do NOT throw, auth should still succeed
+  }
+}
+
+/**
  * POST /api/auth/signup
- * Traveler signup: stores user in MongoDB with encrypted password.
+ * Traveler signup: stores user in MongoDB with encrypted password,
+ * then syncs a profile row into MySQL `users` table.
  */
 router.post('/signup', async (req, res, next) => {
   console.log('>>> [AUTH] Mongo SIGNUP handler reached, body =', req.body);
@@ -44,13 +77,16 @@ router.post('/signup', async (req, res, next) => {
       role: user.role
     });
 
+    // ✅ Sync profile into MySQL (non-blocking for auth success)
+    await syncTravelerProfileToMySQL(user);
+
     // Store session info (Mongo-backed session store)
     req.session.userId = user._id.toString();
     req.session.role = 'traveler';
 
     res.status(201).json({
       id: String(user._id),
-      source: 'traveler-mongo-auth',      // 👈 unmistakable
+      source: 'traveler-mongo-auth',
       name: user.name,
       email: user.email,
       role: 'traveler'
@@ -63,7 +99,8 @@ router.post('/signup', async (req, res, next) => {
 
 /**
  * POST /api/auth/login
- * Traveler login: verifies Mongo user with bcrypt and sets session.
+ * Traveler login: verifies Mongo user with bcrypt and sets session,
+ * then backfills MySQL `users` row if it does not exist yet.
  */
 router.post('/login', async (req, res, next) => {
   console.log('>>> [AUTH] Mongo LOGIN handler reached, body =', req.body);
@@ -90,9 +127,25 @@ router.post('/login', async (req, res, next) => {
     req.session.userId = user._id.toString();
     req.session.role = user.role || 'traveler';
 
+    // ✅ Backfill MySQL profile row if missing (for users created before sync existed)
+    try {
+      const uid = String(user._id);
+      const [rows] = await pool.query(
+        'SELECT id FROM users WHERE id = ?',
+        [uid]
+      );
+      if (!rows.length) {
+        console.log('>>> [AUTH] No MySQL profile for traveler id =', uid, '—creating now');
+        await syncTravelerProfileToMySQL(user);
+      }
+    } catch (err) {
+      console.error('>>> [AUTH] MySQL backfill error on login:', err);
+      // Do NOT fail login if this breaks
+    }
+
     res.json({
       id: String(user._id),
-      source: 'traveler-mongo-auth',      // 👈 same tag
+      source: 'traveler-mongo-auth',
       name: user.name,
       email: user.email,
       role: req.session.role
