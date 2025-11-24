@@ -22,18 +22,37 @@ export default function Profile() {
     setErr("");
     try {
       const data = await travelerApi.me();
-      if (typeof data.languages === "string") {
-        try { data.languages = JSON.parse(data.languages); } catch { data.languages = []; }
+
+      // If /me returned 404 (handled as null by api.js), just store null
+      // and DON'T try to read data.languages.
+      if (!data) {
+        setMe(null);
+        return;
       }
+
+      // Normal case: make sure languages is an array
+      if (typeof data.languages === "string") {
+        try {
+          data.languages = JSON.parse(data.languages);
+        } catch {
+          data.languages = [];
+        }
+      } else if (!Array.isArray(data.languages)) {
+        data.languages = [];
+      }
+
       setMe(data);
     } catch (e) {
+      // If travelerApi.me throws for some other reason, show the error nicely
       setErr(e.message || "Failed to load profile");
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   const isComplete = useMemo(() => {
     if (!me) return false;
@@ -48,25 +67,36 @@ export default function Profile() {
     return hasAny;
   }, [me]);
 
-  function openComplete() { setShowModal(true); }
-  function openEdit() { setShowModal(true); }
-  function onSaved(updated) { setMe(updated); setShowModal(false); }
+  function openComplete() {
+    setShowModal(true);
+  }
+  function openEdit() {
+    setShowModal(true);
+  }
+  function onSaved(updated) {
+    setMe(updated);
+    setShowModal(false);
+  }
 
   if (loading) return <div className="container py-5">Loading…</div>;
   if (err) return <div className="container py-5 text-danger">{err}</div>;
   if (!me) return null;
 
-  const initial = String(me.name || me.email || "U").trim().charAt(0).toUpperCase();
+  const initial = String(me.name || me.email || "U")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
 
   // --- Avatar absolute URL fix ---
   const TRAVELER_API = process.env.REACT_APP_TRAVELER_API || "";
   const rawAvatar = me.avatarUrl || me.avatar_url || ""; // support either casing
-  const avatarSrc =
-    rawAvatar
-      ? (/^https?:\/\//i.test(rawAvatar)
-          ? rawAvatar
-          : `${TRAVELER_API}${rawAvatar.startsWith("/") ? rawAvatar : `/${rawAvatar}`}`)
-      : "";
+  const avatarSrc = rawAvatar
+    ? /^https?:\/\//i.test(rawAvatar)
+      ? rawAvatar
+      : `${TRAVELER_API}${
+          rawAvatar.startsWith("/") ? rawAvatar : `/${rawAvatar}`
+        }`
+    : "";
 
   return (
     <div className="container py-4">
@@ -76,10 +106,14 @@ export default function Profile() {
           <div className="profile-rail-nav">
             <button
               type="button"
-              className={`profile-rail-item ${activeSection === "about" ? "active" : ""}`}
+              className={`profile-rail-item ${
+                activeSection === "about" ? "active" : ""
+              }`}
               onClick={() => setActiveSection("about")}
             >
-              <span className="me-2"><i className="bi bi-person-circle" /></span>
+              <span className="me-2">
+                <i className="bi bi-person-circle" />
+              </span>
               About me
             </button>
 
@@ -87,10 +121,14 @@ export default function Profile() {
               <>
                 <button
                   type="button"
-                  className={`profile-rail-item ${activeSection === "past" ? "active" : ""}`}
+                  className={`profile-rail-item ${
+                    activeSection === "past" ? "active" : ""
+                  }`}
                   onClick={() => setActiveSection("past")}
                 >
-                  <span className="me-2"><i className="bi bi-suitcase-lg" /></span>
+                  <span className="me-2">
+                    <i className="bi bi-suitcase-lg" />
+                  </span>
                   Past trips
                 </button>
 
@@ -99,7 +137,9 @@ export default function Profile() {
                   className="profile-rail-item"
                   onClick={() => navigate("/bookings")}
                 >
-                  <span className="me-2"><i className="bi bi-journal-bookmark" /></span>
+                  <span className="me-2">
+                    <i className="bi bi-journal-bookmark" />
+                  </span>
                   Bookings
                 </button>
               </>
@@ -154,11 +194,13 @@ export default function Profile() {
                         </>
                       ) : null}
 
-                      {(me.city || me.state || me.country) ? (
+                      {me.city || me.state || me.country ? (
                         <>
                           <dt className="col-sm-4">Location</dt>
                           <dd className="col-sm-8">
-                            {[me.city, me.state, me.country].filter(Boolean).join(", ")}
+                            {[me.city, me.state, me.country]
+                              .filter(Boolean)
+                              .join(", ")}
                           </dd>
                         </>
                       ) : null}
@@ -210,11 +252,7 @@ export default function Profile() {
       </div>
 
       {showModal && (
-        <ProfileModal
-          initial={me}
-          onClose={() => setShowModal(false)}
-          onSaved={onSaved}
-        />
+        <ProfileModal initial={me} onClose={() => setShowModal(false)} onSaved={onSaved} />
       )}
     </div>
   );

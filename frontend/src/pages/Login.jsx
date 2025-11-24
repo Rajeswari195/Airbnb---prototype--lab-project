@@ -3,9 +3,15 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { travelerApi, ownerApi } from "../services/api";
 import "./Login.css";
 
-const HOST_INTENT_KEY = "host_intent"; 
+// ✅ Redux imports
+import { useDispatch } from "react-redux";
+import { setAuth } from "../features/auth/authSlice";
+
+const HOST_INTENT_KEY = "host_intent";
 
 export default function Login() {
+  const dispatch = useDispatch();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,15 +20,17 @@ export default function Login() {
   const location = useLocation();
   const pending = location.state || null;
 
-  async function completeHostFlowIfNeeded() {
+  // ✅ now accepts an optional existingToken so we don’t call sessionToken twice
+  async function completeHostFlowIfNeeded(existingToken) {
     const hasLocalIntent = localStorage.getItem(HOST_INTENT_KEY) === "1";
     const hasStateIntent = pending && pending.intent === "host";
     if (!hasLocalIntent && !hasStateIntent) return false;
 
     try {
-      const { token } = await travelerApi.sessionToken();
-      await ownerApi.exchange(token);
-      await ownerApi.enableHost(); 
+      const tokenToUse =
+        existingToken || (await travelerApi.sessionToken()).token;
+      await ownerApi.exchange(tokenToUse);
+      await ownerApi.enableHost();
     } finally {
       localStorage.removeItem(HOST_INTENT_KEY);
     }
@@ -34,20 +42,43 @@ export default function Login() {
     setLoading(true);
     setErr("");
     try {
+      // 1) Normal login
       await travelerApi.login({ email, password });
 
-      const wentHost = await completeHostFlowIfNeeded();
+      // 2) Get JWT/session token once (if backend exposes it)
+      let token = null;
+      try {
+        const session = await travelerApi.sessionToken();
+        token = session?.token || null;
+      } catch {
+        // ignore; we still mark user as authenticated in Redux
+      }
+
+      // 3) Store auth in Redux
+      dispatch(
+        setAuth({
+          token,
+          role: "TRAVELER",
+        })
+      );
+
+      // 4) Host-intent flow (reuse token if we have it)
+      const wentHost = await completeHostFlowIfNeeded(token);
       if (wentHost) {
         navigate("/owner", { replace: true });
         return;
       }
 
+      // 5) Pending favorite flow
       if (pending && pending.intent === "favorite" && pending.propertyId) {
-        try { await travelerApi.addFavorite(Number(pending.propertyId)); } catch {}
+        try {
+          await travelerApi.addFavorite(Number(pending.propertyId));
+        } catch {}
         navigate(pending.from || "/", { replace: true });
         return;
       }
 
+      // 6) Pending booking flow
       if (
         pending &&
         pending.intent === "booking" &&
@@ -61,6 +92,7 @@ export default function Login() {
         return;
       }
 
+      // 7) Default redirect
       navigate("/", { replace: true });
     } catch (e) {
       setErr(e.message || "Login failed");
@@ -104,13 +136,19 @@ export default function Login() {
             />
           </div>
 
-          <button className="btn btn-danger btn-lg w-100 auth-cta" disabled={loading}>
+          <button
+            className="btn btn-danger btn-lg w-100 auth-cta"
+            disabled={loading}
+          >
             {loading ? "Signing in…" : "Continue"}
           </button>
         </form>
 
         <div className="auth-footer mt-4">
-          New here? <Link to="/signup" state={pending}>Create an account</Link>
+          New here?{" "}
+          <Link to="/signup" state={pending}>
+            Create an account
+          </Link>
         </div>
       </div>
     </div>

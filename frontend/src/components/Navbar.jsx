@@ -17,7 +17,9 @@ export default function Navbar() {
 
   useEffect(() => {
     function onDocClick(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false);
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowMenu(false);
+      }
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
@@ -33,7 +35,10 @@ export default function Navbar() {
       setUser(null);
     }
   }
-  useEffect(() => { checkSession(); }, [location.pathname]);
+
+  useEffect(() => {
+    checkSession();
+  }, [location.pathname]);
 
   function toggleMenu() {
     const next = !showMenu;
@@ -42,59 +47,53 @@ export default function Navbar() {
   }
 
   async function handleLogout() {
-    try { await travelerApi.logout(); } catch (_) {}
+    try {
+      await travelerApi.logout();
+    } catch (_) {}
     setAuthed(false);
     setUser(null);
     setShowMenu(false);
     navigate("/");
   }
 
-  const initial = ((user?.name || user?.email || "").trim()[0] || "").toUpperCase() || "U";
-  const isOwner = user?.role === "owner";
+  const initial =
+    ((user?.name || user?.email || "").trim()[0] || "").toUpperCase() || "U";
   const inHostArea = location.pathname.startsWith("/owner");
 
   const hostUIMode = inHostArea || !!location.state?.hostMode;
 
   async function ensureOwnerSession() {
     const { token } = await travelerApi.sessionToken();
-    await ownerApi.exchange(token);               
+    await ownerApi.exchange(token);
   }
+
   async function confirmOwnerReady() {
     try {
       await ownerApi.dashboard();
     } catch {
-      await new Promise(r => setTimeout(r, 150));
+      await new Promise((r) => setTimeout(r, 150));
       await ownerApi.dashboard();
     }
   }
 
   async function onHostCtaClick() {
+    // Not logged in → remember intent and go to login
     if (!authed) {
       localStorage.setItem(HOST_INTENT_KEY, "1");
       navigate("/login");
       return;
     }
 
-    if (inHostArea && isOwner) {
+    // Already in host area → switch back to traveler view
+    if (inHostArea) {
       navigate("/");
       return;
     }
 
-    if (!isOwner) {
-      try {
-        await ensureOwnerSession();       
-        await ownerApi.enableHost();      
-        await confirmOwnerReady();
-        navigate("/owner");
-      } catch {
-        localStorage.setItem(HOST_INTENT_KEY, "1");
-        navigate("/login");
-      }
-      return;
-    }
-
+    // Traveler view → enable host + go to /owner
     try {
       await ensureOwnerSession();
+      await ownerApi.enableHost();
       await confirmOwnerReady();
       navigate("/owner");
     } catch {
@@ -105,7 +104,9 @@ export default function Navbar() {
 
   const hostCtaLabel = !authed
     ? "Become a host"
-    : (isOwner ? (inHostArea ? "Switch to traveler" : "Switch to host") : "Become a host");
+    : inHostArea
+    ? "Switch to traveler"
+    : "Become a host";
 
   return (
     <>
@@ -119,7 +120,11 @@ export default function Navbar() {
 
           <nav className="nav-center">
             <NavItem to="/" exact icon="bi-house-door-fill" label="Homes" />
-            <NavItem to="/experiences" icon="bi-balloon-heart-fill" label="Experiences" />
+            <NavItem
+              to="/experiences"
+              icon="bi-balloon-heart-fill"
+              label="Experiences"
+            />
             <NavItem to="/services" icon="bi-bell-fill" label="Services" />
           </nav>
 
@@ -135,12 +140,19 @@ export default function Navbar() {
               <button
                 className="btn border circle-btn nav-avatar"
                 title="Profile"
-                onClick={() => navigate("/profile", { state: inHostArea ? { hostMode: true } : undefined })}
+                onClick={() =>
+                  navigate("/profile", {
+                    state: inHostArea ? { hostMode: true } : undefined,
+                  })
+                }
               >
                 <span>{initial}</span>
               </button>
             ) : (
-              <button className="btn btn-light border circle-btn nav-icon" title="Language">
+              <button
+                className="btn btn-light border circle-btn nav-icon"
+                title="Language"
+              >
                 <i className="bi bi-globe"></i>
               </button>
             )}
@@ -156,7 +168,9 @@ export default function Navbar() {
               </button>
 
               <div
-                className={`dropdown-menu dropdown-menu-end shadow ${showMenu ? "show" : ""}`}
+                className={`dropdown-menu dropdown-menu-end shadow ${
+                  showMenu ? "show" : ""
+                }`}
                 style={{ right: 0, left: "auto" }}
               >
                 {!authed && (
@@ -181,7 +195,9 @@ export default function Navbar() {
                       Log in or Sign up
                     </button>
                     <div className="dropdown-divider"></div>
-                    <a className="dropdown-item" href="#help">Help Center</a>
+                    <a className="dropdown-item" href="#help">
+                      Help Center
+                    </a>
                   </>
                 )}
 
@@ -202,14 +218,21 @@ export default function Navbar() {
                       className="dropdown-item"
                       onClick={() => {
                         setShowMenu(false);
-                        navigate("/profile", { state: inHostArea ? { hostMode: true } : undefined });
+                        navigate("/profile", {
+                          state: inHostArea ? { hostMode: true } : undefined,
+                        });
                       }}
                     >
                       Profile
                     </button>
-                    <a className="dropdown-item" href="#help">Help Center</a>
+                    <a className="dropdown-item" href="#help">
+                      Help Center
+                    </a>
                     <div className="dropdown-divider"></div>
-                    <button className="dropdown-item text-danger" onClick={handleLogout}>
+                    <button
+                      className="dropdown-item text-danger"
+                      onClick={handleLogout}
+                    >
                       Log out
                     </button>
                   </>
