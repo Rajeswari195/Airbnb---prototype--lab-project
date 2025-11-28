@@ -7,8 +7,8 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 COPY src ./src
-# Copy uploads if they exist
-COPY uploads ./uploads
+# Create uploads directory
+RUN mkdir -p uploads
 
 ENV PORT=8001
 EXPOSE 8001

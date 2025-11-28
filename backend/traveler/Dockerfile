@@ -7,8 +7,8 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 COPY src ./src
-# Copy uploads if they exist (mostly for owner/property services)
-COPY uploads ./uploads
+# Create uploads directory
+RUN mkdir -p uploads
 
 # Default port (can be overridden)
 ENV PORT=8000
