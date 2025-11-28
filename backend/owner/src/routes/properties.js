@@ -1,6 +1,6 @@
 // owner/src/routes/properties.js
 import { Router } from 'express';
-import pool from '../db/pool.js';
+import Property from '../models/Property.js';
 import requireAuth from '../middleware/auth.js';
 import multer from 'multer';
 import path from 'path';
@@ -39,15 +39,25 @@ const propSchema = Joi.object({
 router.post('/', requireAuth, async (req, res, next) => {
   try {
     const p = await propSchema.validateAsync(req.body, { abortEarly: false });
-    const [r] = await pool.query(
-      `INSERT INTO properties
-        (owner_id,title,type,description,amenities,price,address,city,bedrooms,bathrooms,capacity)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-      [req.session.userId, p.title, p.type, p.description || '',
-       JSON.stringify(p.amenities || []), p.price, p.address || '', p.city,
-       p.bedrooms, p.bathrooms, p.capacity]
-    );
-    res.status(201).json({ id: r.insertId });
+
+    const property = new Property({
+      ownerId: req.session.userId,
+      title: p.title,
+      type: p.type,
+      description: p.description,
+      amenities: p.amenities,
+      price: p.price,
+      address: p.address,
+      city: p.city,
+      location: p.city, // fallback
+      bedrooms: p.bedrooms,
+      bathrooms: p.bathrooms,
+      capacity: p.capacity,
+      photos: []
+    });
+    await property.save();
+
+    res.status(201).json({ id: property._id });
   } catch (e) {
     if (e.isJoi) return res.status(400).json({ error: 'Validation failed', details: e.details });
     next(e);
@@ -57,23 +67,29 @@ router.post('/', requireAuth, async (req, res, next) => {
 /** PUT /api/properties/:id (edit details) */
 router.put('/:id', requireAuth, async (req, res, next) => {
   try {
-    const pid = Number(req.params.id);
+    const { id } = req.params;
     const p = await propSchema
       .fork(Object.keys(propSchema.describe().keys), (s) => s.optional())
       .validateAsync(req.body, { abortEarly: false });
 
-    await pool.query(
-      `UPDATE properties SET
-         title=COALESCE(?,title), type=COALESCE(?,type), description=COALESCE(?,description),
-         amenities=COALESCE(?,amenities), price=COALESCE(?,price), address=COALESCE(?,address),
-         city=COALESCE(?,city), bedrooms=COALESCE(?,bedrooms), bathrooms=COALESCE(?,bathrooms),
-         capacity=COALESCE(?,capacity)
-       WHERE id=? AND owner_id=?`,
-      [p.title ?? null, p.type ?? null, p.description ?? null,
-       p.amenities ? JSON.stringify(p.amenities) : null, p.price ?? null, p.address ?? null,
-       p.city ?? null, p.bedrooms ?? null, p.bathrooms ?? null, p.capacity ?? null,
-       pid, req.session.userId]
-    );
+    const property = await Property.findOne({ _id: id, ownerId: req.session.userId });
+    if (!property) return res.status(404).json({ error: 'Property not found' });
+
+    if (p.title) property.title = p.title;
+    if (p.type) property.type = p.type;
+    if (p.description !== undefined) property.description = p.description;
+    if (p.amenities) property.amenities = p.amenities;
+    if (p.price) property.price = p.price;
+    if (p.address !== undefined) property.address = p.address;
+    if (p.city) {
+      property.city = p.city;
+      property.location = p.city;
+    }
+    if (p.bedrooms) property.bedrooms = p.bedrooms;
+    if (p.bathrooms) property.bathrooms = p.bathrooms;
+    if (p.capacity) property.capacity = p.capacity;
+
+    await property.save();
     res.json({ ok: true });
   } catch (e) {
     if (e.isJoi) return res.status(400).json({ error: 'Validation failed', details: e.details });
@@ -84,18 +100,20 @@ router.put('/:id', requireAuth, async (req, res, next) => {
 /** GET /api/properties (list my properties) */
 router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const [rows] = await pool.query(
-      `SELECT id,title,type,price,city,address,bedrooms,bathrooms,capacity,amenities
-         FROM properties WHERE owner_id=? ORDER BY id DESC`,
-      [req.session.userId]
-    );
+    const properties = await Property.find({ ownerId: req.session.userId }).sort({ _id: -1 });
 
-    const out = rows.map(r => {
-      if (typeof r.amenities === 'string') {
-        try { r.amenities = JSON.parse(r.amenities); } catch { r.amenities = []; }
-      }
-      return r;
-    });
+    const out = properties.map(p => ({
+      id: p._id,
+      title: p.title,
+      type: p.type,
+      price: p.price,
+      city: p.city,
+      address: p.address,
+      bedrooms: p.bedrooms,
+      bathrooms: p.bathrooms,
+      capacity: p.capacity,
+      amenities: p.amenities || []
+    }));
 
     res.json(out);
   } catch (e) { next(e); }
@@ -104,47 +122,49 @@ router.get('/', requireAuth, async (req, res, next) => {
 /** GET /api/properties/:id */
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
-    const pid = Number(req.params.id);
-    const [[p]] = await pool.query(
-      `SELECT id,title,type,description,amenities,price,address,city,bedrooms,bathrooms,capacity,photos
-         FROM properties WHERE id=? AND owner_id=?`,
-      [pid, req.session.userId]
-    );
+    const { id } = req.params;
+    const p = await Property.findOne({ _id: id, ownerId: req.session.userId });
+
     if (!p) return res.status(404).json({ error: 'Property not found' });
-    if (typeof p.amenities === 'string') { try { p.amenities = JSON.parse(p.amenities); } catch { p.amenities = []; } }
-    if (typeof p.photos === 'string')  { try { p.photos = JSON.parse(p.photos); } catch { p.photos = []; } }
-    res.json(p);
+
+    res.json({
+      id: p._id,
+      title: p.title,
+      type: p.type,
+      description: p.description,
+      amenities: p.amenities || [],
+      price: p.price,
+      address: p.address,
+      city: p.city,
+      bedrooms: p.bedrooms,
+      bathrooms: p.bathrooms,
+      capacity: p.capacity,
+      photos: p.photos || []
+    });
   } catch (e) { next(e); }
 });
 
 /** POST /api/properties/:id/photos (upload one photo) */
 router.post('/:id/photos', requireAuth, upload.single('file'), async (req, res, next) => {
   try {
-    const pid = Number(req.params.id);
+    const { id } = req.params;
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
     const absoluteUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
 
-    const [[row]] = await pool.query(
-      `SELECT photos FROM properties WHERE id=? AND owner_id=?`,
-      [pid, req.session.userId]
-    );
-    if (!row) return res.status(404).json({ error: 'Property not found' });
+    const property = await Property.findOne({ _id: id, ownerId: req.session.userId });
+    if (!property) return res.status(404).json({ error: 'Property not found' });
 
-    let photos = [];
-    if (row.photos) {
-      try { photos = typeof row.photos === 'string' ? JSON.parse(row.photos) : row.photos; }
-      catch { photos = []; }
-    }
-    photos = Array.isArray(photos) ? photos : [];
-    photos.push(absoluteUrl);
+    if (!property.photos) property.photos = [];
+    property.photos.push(absoluteUrl);
 
-    await pool.query(
-      `UPDATE properties SET photos=? WHERE id=? AND owner_id=?`,
-      [JSON.stringify(photos), pid, req.session.userId]
-    );
+    // Also update images alias if used
+    if (!property.images) property.images = [];
+    property.images.push(absoluteUrl);
 
-    res.json({ url: absoluteUrl, photos });
+    await property.save();
+
+    res.json({ url: absoluteUrl, photos: property.photos });
   } catch (e) { next(e); }
 });
 

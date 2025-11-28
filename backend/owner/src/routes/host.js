@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import pool from '../db/pool.js';
+import User from '../models/User.js';
 
 const router = Router();
 
@@ -13,12 +13,19 @@ router.post('/enable', async (req, res, next) => {
     const uid = req.session?.userId;
     if (!uid) return res.status(401).json({ error: 'Unauthorized' });
 
-    await pool.query('UPDATE users SET role=? WHERE id=?', ['owner', uid]);
+    await User.findByIdAndUpdate(uid, { role: 'owner' });
 
     // Refresh both shapes to match existing code patterns
     req.session.user = { id: uid, role: 'owner' };
     req.session.userId = uid;
     req.session.role = 'owner';
+
+    await new Promise((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
 
     res.json({ ok: true, role: 'owner' });
   } catch (e) { next(e); }

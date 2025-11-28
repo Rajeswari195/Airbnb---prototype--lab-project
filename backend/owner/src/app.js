@@ -27,8 +27,12 @@ await connectMongoOwner();
 const app = express();
 
 // ---- Parsers ----
+// ---- Parsers ----
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+import traceMiddleware from './middleware/trace.js';
+app.use(traceMiddleware);
 
 // ---- Debug whoami ----
 app.get('/__whoami', (_req, res) => {
@@ -56,7 +60,14 @@ const allowed = [
 
 app.use(
   cors({
-    origin: (origin, cb) => cb(null, !origin || allowed.includes(origin)),
+    origin: (origin, cb) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return cb(null, true);
+      if (allowed.indexOf(origin) !== -1 || origin.startsWith('http://localhost')) {
+        return cb(null, true);
+      }
+      return cb(new Error('Not allowed by CORS'));
+    },
     credentials: true,
   })
 );
@@ -69,7 +80,7 @@ const sessionSecret =
 
 app.use(
   session({
-    name: 'owner_sid',
+    name: 'sid',
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
@@ -81,7 +92,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: false, // Allow HTTP for localhost lab environment
       maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   })
@@ -131,9 +142,9 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: err.message || 'Server error' });
 });
 
-const port = Number(process.env.PORT || 8001);
-app.listen(port, () => {
-  console.log(`Owner API listening on :${port}`);
-});
+// const port = Number(process.env.PORT || 8001);
+// app.listen(port, () => {
+//   console.log(`Owner API listening on :${port}`);
+// });
 
 export default app;

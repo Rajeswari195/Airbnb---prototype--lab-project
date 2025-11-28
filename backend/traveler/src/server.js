@@ -1,7 +1,9 @@
 // backend/traveler/src/server.js
 import app from './app.js';
 import { startStatusConsumer } from './kafka/statusConsumer.js';
+import { startAnalyticsConsumer } from './kafka/analyticsConsumer.js';
 import { connectMongoTraveler } from './config/mongo.js';
+import { connectProducer } from './kafka/producer.js';
 
 const port = Number(process.env.PORT || 8000);
 
@@ -13,16 +15,25 @@ async function startServer() {
     // 1. Connect to Mongo first
     await connectMongoTraveler();
 
-    // 2. Start Express
+    // 2. Connect Kafka Producer
+    await connectProducer();
+
+    // 3. Start Express
     app.listen(port, () => {
       console.log(`Traveler API listening on :${port}`);
 
-      // 3. Start Kafka if enabled
+      // 4. Start Kafka Consumers if enabled
       if (enableKafka) {
-        console.log('[traveler-service] Kafka consumer enabled, starting...');
+        console.log('[traveler-service] Kafka consumers enabled, starting...');
         startStatusConsumer().catch((err) => {
           console.error(
             '[traveler-service] Kafka status consumer failed to start:',
+            err
+          );
+        });
+        startAnalyticsConsumer().catch((err) => {
+          console.error(
+            '[traveler-service] Kafka analytics consumer failed to start:',
             err
           );
         });

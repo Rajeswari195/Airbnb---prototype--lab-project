@@ -23,6 +23,7 @@ load_dotenv(dotenv_path=ENV_PATH, override=True)
 
 AGENT_PORT = int(os.getenv("AGENT_PORT", "8500"))
 CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS", "")
+print(f"DEBUG: CORS_ORIGINS_RAW='{CORS_ORIGINS_RAW}'")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 MODEL_NAME = os.getenv("GEMINI_MODEL_NAME") or "gemini-2.5-pro"
@@ -46,7 +47,7 @@ tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
 # -----------------------------
 app = FastAPI(title="AI Concierge Agent")
 
-cors_origins = [o.strip() for o in CORS_ORIGINS_RAW.split(",") if o.strip()]
+cors_origins = ["*"]
 if cors_origins:
     app.add_middleware(
         CORSMiddleware,

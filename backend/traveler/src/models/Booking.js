@@ -1,0 +1,15 @@
+import mongoose from 'mongoose';
+
+const bookingSchema = new mongoose.Schema({
+    propertyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Property', required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // traveler
+    startDate: { type: Date, required: true },
+    endDate: { type: Date, required: true },
+    guests: { type: Number, required: true },
+    totalPrice: { type: Number },
+    status: { type: String, enum: ['Pending', 'Accepted', 'Cancelled'], default: 'Pending' },
+    createdAt: { type: Date, default: Date.now }
+});
+
+const Booking = mongoose.model('Booking', bookingSchema);
+export default Booking;

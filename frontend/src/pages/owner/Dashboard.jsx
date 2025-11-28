@@ -82,6 +82,7 @@ export default function OwnerDashboard() {
                   <th>Dates</th>
                   <th>Guests</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -94,10 +95,38 @@ export default function OwnerDashboard() {
                     <td>
                       <span className={`badge ${badgeClass(r.status)}`}>{r.status}</span>
                     </td>
+                    <td>
+                      {r.status === 'Pending' && (
+                        <div className="btn-group btn-group-sm">
+                          <button
+                            className="btn btn-success"
+                            onClick={async () => {
+                              try {
+                                await ownerApi.acceptBooking(r.id);
+                                load();
+                              } catch (e) { alert(e.message); }
+                            }}
+                          >
+                            Accept
+                          </button>
+                          <button
+                            className="btn btn-outline-danger"
+                            onClick={async () => {
+                              try {
+                                await ownerApi.cancelBooking(r.id);
+                                load();
+                              } catch (e) { alert(e.message); }
+                            }}
+                          >
+                            Deny
+                          </button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {!recent.length && (
-                  <tr><td colSpan={5} className="text-center text-muted py-4">No recent requests</td></tr>
+                  <tr><td colSpan={6} className="text-center text-muted py-4">No recent requests</td></tr>
                 )}
               </tbody>
             </table>

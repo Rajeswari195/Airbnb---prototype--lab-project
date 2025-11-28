@@ -1,0 +1,66 @@
+/* Premium Global Styles */
+:root {
+  --primary-color: #ff385c;
+  --secondary-color: #008489;
+  --background-color: #ffffff;
+  --text-color: #222222;
+  --light-gray: #f7f7f7;
+  --border-radius: 12px;
+  --box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Premium Card Style */
+.card {
+  border: none;
+  border-radius: var(--border-radius);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--box-shadow);
+}
+
+/* Premium Buttons */
+.btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 10px 20px;
+}
+
+.btn-primary:hover {
+  background-color: #e31c5f;
+  border-color: #e31c5f;
+}
+
+/* Navbar */
+.navbar {
+  box-shadow: 0 1px 0 rgb(0 0 0 / 8%);
+  background-color: #fff;
+  padding: 1rem 2rem;
+}
+
+.navbar-brand {
+  color: var(--primary-color) !important;
+  font-weight: 800;
+  font-size: 1.5rem;
+}

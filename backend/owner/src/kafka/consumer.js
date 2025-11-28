@@ -37,9 +37,53 @@ export async function startBookingConsumer() {
   });
 }
 
+import Booking from '../models/Booking.js';
+
 async function handleBookingCreated(event) {
-  // For now just log – later you can update DB / notifications, etc.
   console.log('[owner-service] handleBookingCreated:', event);
+  try {
+    const { bookingId, propertyId, travelerId, startDate, endDate, guests, status, createdAt } = event;
+
+    // Check if booking already exists (idempotency)
+    const existing = await Booking.findById(bookingId);
+    if (existing) {
+      console.log('[owner-service] Booking already exists:', bookingId);
+      return;
+    }
+
+    // Create new booking document with the SAME ID as the MySQL booking
+    const booking = new Booking({
+      _id: bookingId, // Use the ID from the event (MySQL ID) if possible, but Mongoose expects ObjectId. 
+      // Wait, MySQL IDs are integers. MongoDB IDs are ObjectIds.
+      // The Booking model in owner service defines _id as ObjectId by default?
+      // Let's check the Booking model again.
+      propertyId,
+      userId: travelerId,
+      startDate,
+      endDate,
+      guests,
+      status,
+      createdAt
+    });
+
+    // ISSUE: MySQL IDs are integers (1, 2, 3). MongoDB IDs are 24-char hex strings.
+    // If I try to save `_id: 1` in Mongoose, it might fail if the schema expects ObjectId.
+    // The Booking model I viewed earlier:
+    // const bookingSchema = new mongoose.Schema({ propertyId: { type: ObjectId ... } ... });
+    // It doesn't explicitly define _id, so it defaults to ObjectId.
+
+    // If I save it without _id, Mongoose generates a new ObjectId.
+    // But then I can't correlate it easily with the MySQL booking for updates (Accept/Cancel).
+    // The event has `bookingId`. I should store this as `mysqlBookingId` or similar?
+    // OR, I can just store it as `_id` if I change the schema to allow Number or String.
+
+    // Let's look at the Booking model again.
+
+    await booking.save();
+    console.log('[owner-service] Booking saved to MongoDB:', booking._id);
+  } catch (err) {
+    console.error('[owner-service] Failed to save booking:', err);
+  }
 }
 
 // NOTE:

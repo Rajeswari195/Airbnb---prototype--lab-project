@@ -30,7 +30,10 @@ export default function Requests() {
 
   const filtered = useMemo(() => {
     if (tab === "All") return rows;
-    return rows.filter((r) => r.status === tab);
+    const target = tab.toLowerCase();
+    return rows.filter(
+      (r) => (r.status || "").toLowerCase() === target
+    );
   }, [rows, tab]);
 
   async function handleAccept(id) {
@@ -67,9 +70,7 @@ export default function Requests() {
         {tabs.map((t) => (
           <li className="nav-item" key={t}>
             <button
-              className={
-                "nav-link" + (t === tab ? " active" : "")
-              }
+              className={"nav-link" + (t === tab ? " active" : "")}
               onClick={() => setTab(t)}
             >
               {t}
@@ -103,27 +104,28 @@ export default function Requests() {
                 {filtered.map((r) => {
                   const start = formatDate(r.startDate);
                   const end = formatDate(r.endDate);
+                  const status = (r.status || "").toLowerCase();
+                  const displayStatus =
+                    status.charAt(0).toUpperCase() + status.slice(1);
 
                   return (
                     <tr key={r.id}>
                       <td>{r.travelerName || r.travelerId}</td>
                       <td>
                         <div className="fw-semibold">{r.title}</div>
-                        <div className="small text-muted">
-                          {r.city}
-                        </div>
+                        <div className="small text-muted">{r.city}</div>
                       </td>
                       <td className="small">
                         {start} → {end}
                       </td>
                       <td>{r.guests}</td>
                       <td>
-                        <span className={`badge ${badge(r.status)}`}>
-                          {r.status}
+                        <span className={`badge ${badge(status)}`}>
+                          {displayStatus || "Pending"}
                         </span>
                       </td>
                       <td>
-                        {r.status === "Pending" && (
+                        {status === "pending" && (
                           <div className="d-flex gap-2">
                             <button
                               className="btn btn-sm btn-outline-success"
@@ -141,7 +143,7 @@ export default function Requests() {
                             </button>
                           </div>
                         )}
-                        {r.status === "Accepted" && (
+                        {status === "accepted" && (
                           <button
                             className="btn btn-sm btn-outline-danger"
                             onClick={() => handleCancel(r.id)}
@@ -150,7 +152,7 @@ export default function Requests() {
                             Cancel
                           </button>
                         )}
-                        {r.status === "Cancelled" && (
+                        {status === "cancelled" && (
                           <span className="text-muted small">
                             No actions
                           </span>
@@ -170,12 +172,13 @@ export default function Requests() {
 
 function formatDate(value) {
   if (!value) return "";
-  return String(value).slice(0, 10); 
+  return String(value).slice(0, 10);
 }
 
 function badge(s) {
-  if (s === "Accepted") return "text-bg-success";
-  if (s === "Pending") return "text-bg-warning";
-  if (s === "Cancelled") return "text-bg-secondary";
+  const status = (s || "").toLowerCase();
+  if (status === "accepted") return "text-bg-success";
+  if (status === "pending") return "text-bg-warning";
+  if (status === "cancelled") return "text-bg-secondary";
   return "text-bg-light";
 }

@@ -1,9 +1,14 @@
-import { createApp } from './app.js';
+import { createApp, connectMongoProperty } from './app.js';
 
 const PORT = process.env.PORT || 8002;
 
-const app = createApp();
+async function start() {
+  await connectMongoProperty();
+  const app = createApp();
 
-app.listen(PORT, () => {
-  console.log(`Property service listening on :${PORT}`);
-});
+  app.listen(PORT, () => {
+    console.log(`Property service listening on :${PORT}`);
+  });
+}
+
+start();

@@ -1,109 +1,114 @@
 // backend/traveler/src/routes/properties.js
-import { Router } from 'express';
-import pool from '../db/pool.js';
+import { Router } from "express";
+import Property from "../models/Property.js";
+import Booking from "../models/Booking.js";
 
 const router = Router();
 
-/** helper: availability filter (no overlap with existing accepted/pending bookings) */
-async function propertyIdsAvailable(startDate, endDate, guests) {
-  const [rows] = await pool.query(
-    `SELECT p.id
-       FROM properties p
-      WHERE p.capacity >= ?
-        AND NOT EXISTS (
-          SELECT 1 FROM bookings b
-           WHERE b.property_id = p.id
-             AND b.status IN ('Pending','Accepted')
-             AND ? <= b.end_date AND ? >= b.start_date
-        )`,
-    [guests || 1, startDate, endDate]
-  );
-  return rows.map(r => r.id);
+/**
+ * Helper: return IDs of properties that are available for the given dates
+ * and have enough capacity.
+ */
+async function getAvailablePropertyIds(startDate, endDate) {
+  // Find bookings that overlap with the requested range
+  // Overlap logic: (StartA <= EndB) and (EndA >= StartB)
+  const conflictingBookings = await Booking.find({
+    status: { $in: ['Pending', 'Accepted'] },
+    startDate: { $lte: new Date(endDate) },
+    endDate: { $gte: new Date(startDate) }
+  }).select('propertyId');
+
+  const conflictingIds = conflictingBookings.map(b => b.propertyId.toString());
+  return new Set(conflictingIds);
 }
 
 /** GET /api/properties?location=&startDate=&endDate=&guests= */
-router.get('/', async (req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
-    const { location = '', startDate, endDate, guests } = req.query;
+    const { location = "", startDate, endDate, guests } = req.query;
 
-    const isISODate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
-    const hasDates = isISODate(startDate) && isISODate(endDate);
-    const safeGuests = Number.isFinite(Number(guests)) && Number(guests) > 0 ? Number(guests) : 1;
-    const safeLocation = (location || '').trim();
+    const query = {};
 
-    let where = 'WHERE 1=1';
-    const params = [];
-
-    if (safeLocation) {
-      where += ' AND (p.city LIKE ? OR p.address LIKE ?)';
-      params.push(`%${safeLocation}%`, `%${safeLocation}%`);
+    // Location filter (case-insensitive regex)
+    if (location && location.trim()) {
+      const regex = new RegExp(location.trim(), 'i');
+      query.$or = [
+        { city: regex },
+        { address: regex },
+        { location: regex }
+      ];
     }
 
-    // Exclude own listings when logged in
-    if (req.session?.userId) {
-      where += ' AND (p.owner_id IS NULL OR p.owner_id <> ?)';
-      params.push(req.session.userId);
+    // Exclude own listings if logged in
+    if (req.session?.mongoUserId) {
+      query.ownerId = { $ne: req.session.mongoUserId };
     }
 
-    // Enforce capacity whenever guests is provided works with or without dates
+    // Capacity filter
     if (guests && Number(guests) > 0) {
-      where += ' AND p.capacity >= ?';
-      params.push(safeGuests);
+      query.capacity = { $gte: Number(guests) };
     }
 
-    let baseQuery = `SELECT p.id, p.title, p.type, p.price, p.city, p.address,
-                            p.bedrooms, p.bathrooms, p.capacity
-                       FROM properties p
-                     ${where}`;
-    const [base] = await pool.query(baseQuery, params);
-
-    // If a valid date range is provided, filter out unavailable ones
-    let ids = base.map(b => b.id);
-    if (hasDates && ids.length) {
-      const availIds = await propertyIdsAvailable(startDate, endDate, safeGuests);
-      const set = new Set(availIds);
-      ids = ids.filter(id => set.has(id));
+    // Date availability filter
+    if (startDate && endDate) {
+      const conflictingIds = await getAvailablePropertyIds(startDate, endDate);
+      if (conflictingIds.size > 0) {
+        query._id = { $nin: Array.from(conflictingIds) };
+      }
     }
 
-    if (!ids.length) return res.json([]);
+    const properties = await Property.find(query);
 
-    const placeholders = ids.map(() => '?').join(',');
-    const [rows] = await pool.query(
-      `SELECT p.id, p.title, p.type, p.price, p.city, p.address,
-              p.bedrooms, p.bathrooms, p.capacity
-         FROM properties p
-        WHERE p.id IN (${placeholders})`,
-      ids
-    );
-    res.json(rows);
+    // Normalize output to match frontend expectations
+    const normalized = properties.map(p => ({
+      id: p._id,
+      title: p.title,
+      type: p.type,
+      price: p.price,
+      city: p.city || p.location,
+      address: p.address,
+      bedrooms: p.bedrooms,
+      bathrooms: p.bathrooms,
+      capacity: p.capacity,
+      photos: p.photos || p.images || []
+    }));
+
+    res.json(normalized);
   } catch (err) {
     next(err);
   }
 });
 
 /** GET /api/properties/:id */
-router.get('/:id', async (req, res, next) => {
+router.get("/:id", async (req, res, next) => {
   try {
-    const pid = Number(req.params.id);
-    const [[p]] = await pool.query(
-      `SELECT p.id, p.title, p.type, p.description, p.amenities, p.price,
-              p.city, p.address, p.bedrooms, p.bathrooms, p.capacity,
-              p.photos
-         FROM properties p
-        WHERE p.id = ?`,
-      [pid]
-    );
-    if (!p) return res.status(404).json({ error: 'Property not found' });
+    const { id } = req.params;
 
-    // Parse JSON columns if they came back as strings
-    if (typeof p.amenities === 'string') {
-      try { p.amenities = JSON.parse(p.amenities); } catch { p.amenities = []; }
-    }
-    if (typeof p.photos === 'string') {
-      try { p.photos = JSON.parse(p.photos); } catch { p.photos = []; }
+    // Validate ObjectId
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(404).json({ error: "Property not found" });
     }
 
-    res.json(p);
+    const p = await Property.findById(id);
+
+    if (!p) {
+      return res.status(404).json({ error: "Property not found" });
+    }
+
+    res.json({
+      id: p._id,
+      title: p.title,
+      type: p.type,
+      description: p.description,
+      amenities: p.amenities || [],
+      price: p.price,
+      city: p.city || p.location,
+      address: p.address,
+      bedrooms: p.bedrooms,
+      bathrooms: p.bathrooms,
+      capacity: p.capacity,
+      photos: p.photos || p.images || []
+    });
   } catch (err) {
     next(err);
   }

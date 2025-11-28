@@ -30,7 +30,7 @@ export default function PropertyDetails() {
     (async () => {
       try {
         setLoading(true);
-        const data = await travelerApi.property(Number(id));
+        const data = await travelerApi.property(id);
         if (data && typeof data.photos === "string") {
           try { data.photos = JSON.parse(data.photos); } catch { data.photos = []; }
         }
@@ -58,7 +58,7 @@ export default function PropertyDetails() {
       return;
     }
     navigate(
-      `/booking-request?propertyId=${Number(id)}&startDate=${checkIn}&endDate=${checkOut}&guests=${Number(guests) || 1}`
+      `/booking-request?propertyId=${id}&startDate=${checkIn}&endDate=${checkOut}&guests=${Number(guests) || 1}`
     );
   }
 
@@ -95,8 +95,8 @@ export default function PropertyDetails() {
     nights > 0 && priceNum != null
       ? `$${(priceNum * nights).toLocaleString()} for ${nights} night${nights > 1 ? "s" : ""}`
       : priceNum != null
-      ? `$${priceNum.toLocaleString()} night`
-      : "";
+        ? `$${priceNum.toLocaleString()} night`
+        : "";
   const todayISO = new Date().toISOString().slice(0, 10);
   const endMin = checkIn || todayISO;
   const photos = Array.isArray(p.photos) ? p.photos.filter(Boolean) : [];

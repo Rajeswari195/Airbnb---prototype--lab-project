@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import pool from '../db/pool.js';
 import requireAuth from '../middleware/auth.js';
+import User from '../models/User.js';
 import Joi from 'joi';
 
 const router = Router();
@@ -15,12 +15,18 @@ const schema = Joi.object({
 /** GET /api/users/me */
 router.get('/me', requireAuth, async (req, res, next) => {
   try {
-    const [[u]] = await pool.query(
-      `SELECT id, name, email, city AS location, phone, about
-         FROM users WHERE id=?`, [req.session.userId]
-    );
+    const u = await User.findById(req.session.userId).select('id name email city phone about');
     if (!u) return res.status(404).json({ error: 'User not found' });
-    res.json(u);
+
+    // Normalize response to match frontend expectations (city -> location)
+    res.json({
+      id: u._id,
+      name: u.name,
+      email: u.email,
+      location: u.city,
+      phone: u.phone,
+      about: u.about
+    });
   } catch (e) { next(e); }
 });
 
@@ -28,12 +34,14 @@ router.get('/me', requireAuth, async (req, res, next) => {
 router.put('/me', requireAuth, async (req, res, next) => {
   try {
     const p = await schema.validateAsync(req.body, { abortEarly: false });
-    await pool.query(
-      `UPDATE users SET name=COALESCE(?,name), city=COALESCE(?,city),
-                        phone=COALESCE(?,phone), about=COALESCE(?,about)
-        WHERE id=?`,
-      [p.name ?? null, p.location ?? null, p.phone ?? null, p.about ?? null, req.session.userId]
-    );
+
+    const updates = {};
+    if (p.name !== undefined) updates.name = p.name;
+    if (p.location !== undefined) updates.city = p.location;
+    if (p.phone !== undefined) updates.phone = p.phone;
+    if (p.about !== undefined) updates.about = p.about;
+
+    await User.findByIdAndUpdate(req.session.userId, updates);
     res.json({ ok: true });
   } catch (e) {
     if (e.isJoi) return res.status(400).json({ error: 'Validation failed', details: e.details });

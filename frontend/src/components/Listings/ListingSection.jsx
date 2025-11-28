@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { travelerApi } from "../../services/api";
 import ListingCard from "./ListingCard";
 import "./ListingSection.css";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchProperties } from "../../store/slices/propertySlice";
 
 export default function ListingSection({ filters }) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
+  const dispatch = useDispatch();
+  const { list: items, loading, error } = useSelector((state) => state.properties);
   const [favMap, setFavMap] = useState({});
 
   const cleanedFilters = useMemo(() => {
@@ -21,67 +22,25 @@ export default function ListingSection({ filters }) {
     return out;
   }, [filters]);
 
-  async function load() {
-    setLoading(true);
-    setErr("");
-
-    let base = [];
-    try {
-      const data = await travelerApi.listings(cleanedFilters);
-      base = Array.isArray(data) ? data : [];
-    } catch (e) {
-      setErr(e.message || "Failed to load listings");
-    }
-
-    try {
-      const withThumbs = await Promise.all(
-        base.map(async (it) => {
-          try {
-            const detail = await travelerApi.getProperty(it.id);
-            let photos = [];
-            if (detail && detail.photos) {
-              if (Array.isArray(detail.photos)) {
-                photos = detail.photos;
-              } else if (typeof detail.photos === "string") {
-                try {
-                  photos = JSON.parse(detail.photos || "[]");
-                } catch {
-                  photos = [];
-                }
-              }
-            }
-            return {
-              ...it,
-              _thumb: Array.isArray(photos) && photos.length ? photos[0] : null,
-            };
-          } catch {
-            return { ...it, _thumb: null };
-          }
-        })
-      );
-      setItems(withThumbs);
-    } catch {
-      setItems(base);
-    } finally {
-      setLoading(false);
-    }
-
-    try {
-      const favs = await travelerApi.getFavorites();
-      const map = {};
-      (Array.isArray(favs) ? favs : []).forEach((f) => {
-        map[f.propertyId] = f.id;
-      });
-      setFavMap(map);
-    } catch {
-      setFavMap({});
-    }
-  }
-
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(cleanedFilters)]);
+    dispatch(fetchProperties(cleanedFilters));
+  }, [dispatch, cleanedFilters]);
+
+  // Load favorites separately (could be moved to Redux too)
+  useEffect(() => {
+    (async () => {
+      try {
+        const favs = await travelerApi.getFavorites();
+        const map = {};
+        (Array.isArray(favs) ? favs : []).forEach((f) => {
+          map[f.propertyId] = f.id;
+        });
+        setFavMap(map);
+      } catch {
+        setFavMap({});
+      }
+    })();
+  }, []);
 
   async function toggleFavorite(propertyId) {
     try {
@@ -106,46 +65,53 @@ export default function ListingSection({ filters }) {
     }
   }
 
+  // Helper to get thumbnail from item (assuming backend returns photos now, or we handle it)
+  // If backend doesn't return photos in list, we might show placeholder or fetch details.
+  // For now, let's assume backend returns photos or we use placeholder.
+  const getThumb = (it) => {
+    if (it.photos && it.photos.length > 0) return it.photos[0];
+    if (it.images && it.images.length > 0) return it.images[0];
+    return null;
+  };
+
   return (
     <section className="container mt-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h5 className="mb-0">Explore stays</h5>
       </div>
 
-      {err && <div className="alert alert-danger">{err}</div>}
+      {error && <div className="alert alert-danger">{error}</div>}
 
       <div className="row g-4 row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4">
         {loading && items.length === 0
           ? Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="col">
-                <div className="card listing-card">
-                  <div className="listing-thumb-wrap">
-                    <div className="listing-thumb placeholder-wave">
-                      <div className="placeholder w-100 h-100"></div>
-                    </div>
+            <div key={i} className="col">
+              <div className="card listing-card">
+                <div className="listing-thumb-wrap">
+                  <div className="listing-thumb placeholder-wave">
+                    <div className="placeholder w-100 h-100"></div>
                   </div>
-                  <div className="card-body">
-                    <div className="placeholder-wave">
-                      <span className="placeholder col-8"></span>
-                    </div>
-                    <div className="placeholder-wave mt-2">
-                      <span className="placeholder col-5"></span>
-                    </div>
+                </div>
+                <div className="card-body">
+                  <div className="placeholder-wave">
+                    <span className="placeholder col-8"></span>
+                  </div>
+                  <div className="placeholder-wave mt-2">
+                    <span className="placeholder col-5"></span>
                   </div>
                 </div>
               </div>
-            ))
-          : items
-              .filter((it) => it._thumb) // Only include listings with a thumbnail
-              .map((it) => (
-                <div key={it.id} className="col">
-                  <ListingCard
-                    item={it}
-                    isFavorite={!!favMap[it.id]}
-                    onToggleFavorite={toggleFavorite}
-                  />
-                </div>
-              ))}
+            </div>
+          ))
+          : items.map((it) => (
+            <div key={it.id} className="col">
+              <ListingCard
+                item={{ ...it, _thumb: getThumb(it) }}
+                isFavorite={!!favMap[it.id]}
+                onToggleFavorite={toggleFavorite}
+              />
+            </div>
+          ))}
       </div>
     </section>
   );

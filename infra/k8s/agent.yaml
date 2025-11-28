@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent
+  template:
+    metadata:
+      labels:
+        app: agent
+    spec:
+      containers:
+      - name: agent
+        image: docker.io/rajeswari1929/agent-service:lab2
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8500
+        env:
+        - name: AGENT_PORT
+          value: "8500"
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: GEMINI_API_KEY
+        - name: TAVILY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: TAVILY_API_KEY
+        - name: CORS_ORIGINS
+          value: "http://localhost:3000,http://localhost:3001,http://localhost:8500"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-service
+spec:
+  selector:
+    app: agent
+  ports:
+    - protocol: TCP
+      port: 8500
+      targetPort: 8500

@@ -1,6 +1,6 @@
-// backend/booking/src/routes/bookings.js
 import { Router } from 'express';
-import pool from '../db/pool.js';
+import Booking from '../models/Booking.js';
+import Property from '../models/Property.js';
 import requireAuth from '../middleware/auth.js';
 import Joi from 'joi';
 import { sendBookingEvent } from '../kafka/producer.js';
@@ -8,7 +8,7 @@ import { sendBookingEvent } from '../kafka/producer.js';
 const router = Router();
 
 const createSchema = Joi.object({
-  propertyId: Joi.number().integer().required(),
+  propertyId: Joi.string().required(), // ObjectId is string
   startDate: Joi.date().iso().required(),
   endDate: Joi.date().iso().required(),
   guests: Joi.number().integer().min(1).required(),
@@ -30,47 +30,50 @@ router.post('/', requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: 'endDate must be after startDate' });
     }
 
-    const [[prop]] = await pool.query(
-      'SELECT capacity FROM properties WHERE id = ?',
-      [propertyId]
-    );
+    const prop = await Property.findById(propertyId);
     if (!prop) return res.status(404).json({ error: 'Property not found' });
     if (guests > prop.capacity) {
       return res.status(400).json({ error: 'Guests exceed capacity' });
     }
 
-    const [overlap] = await pool.query(
-      `SELECT 1 FROM bookings
-         WHERE property_id = ?
-           AND status IN ('Pending','Accepted')
-           AND ? <= end_date AND ? >= start_date
-         LIMIT 1`,
-      [propertyId, startDate, endDate]
-    );
-    if (overlap.length) {
+    // Check overlap
+    const overlap = await Booking.findOne({
+      propertyId,
+      status: { $in: ['Pending', 'Accepted'] },
+      $or: [
+        { startDate: { $lte: endDate }, endDate: { $gte: startDate } }
+      ]
+    });
+
+    if (overlap) {
       return res.status(409).json({ error: 'Property not available for those dates' });
     }
 
-    const [result] = await pool.query(
-      `INSERT INTO bookings (user_id, property_id, start_date, end_date, guests, status)
-       VALUES (?, ?, ?, ?, ?, 'Pending')`,
-      [req.session.userId, propertyId, startDate, endDate, guests]
-    );
+    const booking = new Booking({
+      userId: req.session.userId,
+      propertyId,
+      startDate,
+      endDate,
+      guests,
+      status: 'Pending',
+      totalPrice: prop.price * ((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24))
+    });
+    await booking.save();
 
-    const responseBody = { id: result.insertId, status: 'Pending' };
+    const responseBody = { id: booking._id, status: 'Pending' };
     res.status(201).json(responseBody);
 
     // ---- ASYNC: publish Kafka event (does not block response) ----
     const event = {
       type: 'BOOKING_CREATED',
-      bookingId: result.insertId,
+      bookingId: booking._id, // ObjectId
       propertyId,
       travelerId: req.session.userId,
       status: 'Pending',
       startDate,
       endDate,
       guests,
-      createdAt: new Date().toISOString(),
+      createdAt: booking.createdAt.toISOString(),
     };
 
     sendBookingEvent(event).catch((err) => {
@@ -88,33 +91,27 @@ router.post('/', requireAuth, async (req, res, next) => {
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const { status, scope } = req.query;
-    const where = ['b.user_id = ?'];
-    const params = [req.session.userId];
+    const query = { userId: req.session.userId };
 
-    if (status) {
-      where.push('b.status = ?');
-      params.push(status);
-    }
-    if (scope === 'past') {
-      where.push('b.end_date < CURDATE()');
-    }
+    if (status) query.status = status;
+    if (scope === 'past') query.endDate = { $lt: new Date() };
 
-    const [rows] = await pool.query(
-      `SELECT b.id,
-              b.property_id AS propertyId,
-              b.start_date AS startDate,
-              b.end_date   AS endDate,
-              b.guests,
-              b.status,
-              p.title,
-              p.city,
-              p.price
-         FROM bookings b
-         JOIN properties p ON p.id = b.property_id
-        WHERE ${where.join(' AND ')}
-        ORDER BY b.start_date DESC`,
-      params
-    );
+    const bookings = await Booking.find(query)
+      .populate('propertyId', 'title city price')
+      .sort({ startDate: -1 });
+
+    const rows = bookings.map(b => ({
+      id: b._id,
+      propertyId: b.propertyId?._id,
+      startDate: b.startDate,
+      endDate: b.endDate,
+      guests: b.guests,
+      status: b.status,
+      title: b.propertyId?.title,
+      city: b.propertyId?.city,
+      price: b.propertyId?.price
+    }));
+
     res.json(rows);
   } catch (err) {
     next(err);
@@ -124,74 +121,60 @@ router.get('/', requireAuth, async (req, res, next) => {
 // Modify a booking (Accepted → Pending again)
 router.put('/:id', requireAuth, async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      return res.status(400).json({ error: 'Invalid id' });
-    }
-
+    const { id } = req.params;
     const payload = await updateSchema.validateAsync(req.body, { abortEarly: false });
 
-    const [[row]] = await pool.query(
-      `SELECT b.id,
-              b.user_id     AS userId,
-              b.property_id AS propertyId,
-              b.start_date  AS startDate,
-              b.end_date    AS endDate,
-              b.guests,
-              b.status,
-              p.capacity
-         FROM bookings b
-         JOIN properties p ON p.id = b.property_id
-        WHERE b.id = ?`,
-      [id]
-    );
-
-    if (!row || row.userId !== req.session.userId) {
+    const booking = await Booking.findOne({ _id: id, userId: req.session.userId }).populate('propertyId');
+    if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
-    if (row.status === 'Cancelled') {
+    if (booking.status === 'Cancelled') {
       return res.status(400).json({ error: 'Cancelled bookings cannot be modified' });
     }
 
-    const newStart = payload.startDate || row.startDate;
-    const newEnd   = payload.endDate   || row.endDate;
-    const newGuests = payload.guests != null ? payload.guests : row.guests;
+    const newStart = payload.startDate ? new Date(payload.startDate) : booking.startDate;
+    const newEnd = payload.endDate ? new Date(payload.endDate) : booking.endDate;
+    const newGuests = payload.guests != null ? payload.guests : booking.guests;
 
-    if (new Date(newEnd) < new Date(newStart)) {
+    if (newEnd < newStart) {
       return res.status(400).json({ error: 'endDate must be after startDate' });
     }
-    if (newGuests > row.capacity) {
+    if (booking.propertyId && newGuests > booking.propertyId.capacity) {
       return res.status(400).json({ error: 'Guests exceed capacity' });
     }
 
-    const [overlap] = await pool.query(
-      `SELECT 1 FROM bookings
-         WHERE property_id = ?
-           AND id <> ?
-           AND status IN ('Pending','Accepted')
-           AND ? <= end_date AND ? >= start_date
-         LIMIT 1`,
-      [row.propertyId, id, newStart, newEnd]
-    );
-    if (overlap.length) {
+    // Check overlap excluding current booking
+    const overlap = await Booking.findOne({
+      propertyId: booking.propertyId._id,
+      _id: { $ne: id },
+      status: { $in: ['Pending', 'Accepted'] },
+      $or: [
+        { startDate: { $lte: newEnd }, endDate: { $gte: newStart } }
+      ]
+    });
+
+    if (overlap) {
       return res.status(409).json({ error: 'Property not available for those dates' });
     }
 
-    const newStatus = row.status === 'Accepted' ? 'Pending' : row.status;
+    booking.startDate = newStart;
+    booking.endDate = newEnd;
+    booking.guests = newGuests;
+    if (booking.status === 'Accepted') booking.status = 'Pending';
 
-    await pool.query(
-      `UPDATE bookings
-          SET start_date = ?, end_date = ?, guests = ?, status = ?
-        WHERE id = ?`,
-      [newStart, newEnd, newGuests, newStatus, id]
-    );
+    // Recalculate price if dates changed
+    if (payload.startDate || payload.endDate) {
+      booking.totalPrice = booking.propertyId.price * ((newEnd - newStart) / (1000 * 60 * 60 * 24));
+    }
+
+    await booking.save();
 
     res.json({
-      id,
-      status: newStatus,
-      startDate: newStart,
-      endDate: newEnd,
-      guests: newGuests,
+      id: booking._id,
+      status: booking.status,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      guests: booking.guests,
     });
   } catch (err) {
     if (err.isJoi) {
@@ -204,28 +187,24 @@ router.put('/:id', requireAuth, async (req, res, next) => {
 // Cancel a booking
 router.post('/:id/cancel', requireAuth, async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      return res.status(400).json({ error: 'Invalid id' });
-    }
+    const { id } = req.params;
+    const booking = await Booking.findOne({ _id: id, userId: req.session.userId });
 
-    const [[row]] = await pool.query(
-      'SELECT id, user_id AS userId, status FROM bookings WHERE id = ?',
-      [id]
-    );
-    if (!row || row.userId !== req.session.userId) {
+    if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
 
-    if (row.status === 'Cancelled') {
-      return res.json({ id, status: 'Cancelled' });
+    if (booking.status === 'Cancelled') {
+      return res.json({ id: booking._id, status: 'Cancelled' });
     }
-    if (row.status !== 'Pending') {
+    if (booking.status !== 'Pending') {
       return res.status(400).json({ error: 'Only Pending bookings can be cancelled' });
     }
 
-    await pool.query('UPDATE bookings SET status = "Cancelled" WHERE id = ?', [id]);
-    res.json({ id, status: 'Cancelled' });
+    booking.status = 'Cancelled';
+    await booking.save();
+
+    res.json({ id: booking._id, status: 'Cancelled' });
   } catch (err) {
     next(err);
   }

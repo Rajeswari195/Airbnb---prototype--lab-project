@@ -1,4 +1,11 @@
--- Users
+-- schema.sql
+CREATE DATABASE IF NOT EXISTS airbnb_app
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+USE airbnb_app;
+
+-- Shared users table (traveler + owner)
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   role ENUM('traveler','owner') NOT NULL DEFAULT 'traveler',
@@ -24,6 +31,7 @@ CREATE TABLE IF NOT EXISTS properties (
   title VARCHAR(120) NOT NULL,
   type VARCHAR(60),
   description TEXT,
+  photos TEXT,
   amenities JSON,
   price DECIMAL(10,2) NOT NULL,
   address VARCHAR(255),
@@ -51,7 +59,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   INDEX idx_bookings_prop_dates (property_id, start_date, end_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Favorites
+-- Favorites (wishlists)
 CREATE TABLE IF NOT EXISTS favorites (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,

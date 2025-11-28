@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { travelerApi } from "../services/api";
+import { useDispatch, useSelector } from "react-redux";
+import { createBooking, resetBookingState } from "../store/slices/bookingSlice";
 
 function useQuery() {
   const { search } = useLocation();
@@ -10,8 +12,17 @@ function useQuery() {
 export default function BookingRequest() {
   const query = useQuery();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { loading: bookingLoading, error: bookingError, success } = useSelector((state) => state.bookings);
 
-  const propertyId = Number(query.get("propertyId"));
+  useEffect(() => {
+    dispatch(resetBookingState());
+    return () => {
+      dispatch(resetBookingState());
+    };
+  }, [dispatch]);
+
+  const propertyId = query.get("propertyId");
   const startDate = query.get("startDate") || "";
   const endDate = query.get("endDate") || "";
   const guests = Number(query.get("guests") || 1);
@@ -22,10 +33,7 @@ export default function BookingRequest() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvc, setCardCvc] = useState("");
+
 
   const nights = useMemo(() => {
     if (!startDate || !endDate) return 0;
@@ -86,17 +94,16 @@ export default function BookingRequest() {
       setErr("Missing booking details.");
       return;
     }
-    try {
-      await travelerApi.createBooking({
-        propertyId,
-        startDate,
-        endDate,
-        guests,
-      });
 
-      navigate("/bookings?tab=pending", { replace: true });
-    } catch (e) {
-      setErr(e.message || "Failed to create booking");
+    const resultAction = await dispatch(createBooking({
+      propertyId,
+      startDate,
+      endDate,
+      guests,
+    }));
+
+    if (!createBooking.fulfilled.match(resultAction)) {
+      setErr(resultAction.payload || "Failed to create booking");
     }
   }
 
@@ -109,62 +116,45 @@ export default function BookingRequest() {
     <div className="container py-4">
       <h3 className="mb-3">Request to book</h3>
 
-      {err && <div className="alert alert-danger">{err}</div>}
+      {(err || bookingError) && <div className="alert alert-danger">{err || bookingError}</div>}
 
       <div className="row g-4">
         <div className="col-12 col-lg-7">
           <div className="card shadow-sm">
             <div className="card-body">
-              <h5 className="mb-3">Add a payment method</h5>
-
-              <div className="mb-3">
-                <label className="form-label">Name on card</label>
-                <input
-                  className="form-control"
-                  value={cardName}
-                  onChange={(e) => setCardName(e.target.value)}
-                />
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label">Card number</label>
-                <input
-                  className="form-control"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value)}
-                />
-              </div>
-
-              <div className="row">
-                <div className="col-6 mb-3">
-                  <label className="form-label">Expiration</label>
-                  <input
-                    className="form-control"
-                    placeholder="MM/YY"
-                    value={cardExpiry}
-                    onChange={(e) => setCardExpiry(e.target.value)}
-                  />
+              {success ? (
+                <div className="text-center py-4">
+                  <h4 className="text-success mb-3">Booking Request Sent!</h4>
+                  <p className="mb-4">Your request is awaiting confirmation from the host.</p>
+                  <button
+                    className="btn btn-outline-primary"
+                    onClick={() => navigate("/bookings?tab=pending")}
+                  >
+                    View My Bookings
+                  </button>
                 </div>
-                <div className="col-6 mb-3">
-                  <label className="form-label">CVC</label>
-                  <input
-                    className="form-control"
-                    value={cardCvc}
-                    onChange={(e) => setCardCvc(e.target.value)}
-                  />
-                </div>
-              </div>
+              ) : (
+                <>
+                  <h5 className="mb-3">Confirm and Pay</h5>
+                  <div className="mb-3">
+                    <p>You are booking <strong>{p?.title}</strong> for <strong>{nights}</strong> nights.</p>
+                    <p>Dates: <strong>{displayStart}</strong> to <strong>{displayEnd}</strong></p>
+                    <p>Guests: <strong>{guests}</strong></p>
+                  </div>
 
-              <button
-                className="btn btn-danger btn-lg mt-2"
-                onClick={handleRequestToBook}
-              >
-                Request to book
-              </button>
+                  <button
+                    className="btn btn-primary btn-lg mt-2 w-100"
+                    onClick={handleRequestToBook}
+                    disabled={bookingLoading}
+                  >
+                    {bookingLoading ? "Processing..." : "Create Booking"}
+                  </button>
 
-              <div className="small text-muted mt-2">
-                You won’t be charged yet
-              </div>
+                  <div className="small text-muted mt-2">
+                    You won’t be charged yet
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -186,6 +176,9 @@ export default function BookingRequest() {
                         height: 70,
                         borderRadius: 8,
                         background: "#f3f3f3",
+                        backgroundImage: p.photos?.[0] ? `url(${p.photos[0]})` : undefined,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center'
                       }}
                       className="me-3"
                     />
@@ -238,6 +231,6 @@ export default function BookingRequest() {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 }

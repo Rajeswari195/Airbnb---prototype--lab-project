@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traveler-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traveler
+  template:
+    metadata:
+      labels:
+        app: traveler
+    spec:
+      containers:
+      - name: traveler
+        image: docker.io/rajeswari1929/traveler-service:lab2
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PORT
+          value: "8000"
+        - name: MONGO_URI
+          value: "mongodb://mongo-service:27017/airbnb"
+        - name: KAFKA_BROKER
+          value: "kafka-service:9092"
+        - name: ENABLE_KAFKA
+          value: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traveler-service
+spec:
+  selector:
+    app: traveler
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000

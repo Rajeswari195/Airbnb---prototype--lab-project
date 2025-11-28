@@ -81,7 +81,7 @@ export default function BookingDetails() {
       const updated = await travelerApi.updateBooking(b.id, body);
 
       alert(
-        b.status === "Accepted" && updated.status === "Pending"
+        b.status === "accepted" && updated.status === "pending"
           ? "Booking updated and sent back to the host for approval."
           : "Booking updated."
       );
@@ -109,7 +109,7 @@ export default function BookingDetails() {
   const startDateObj = b.startDate ? new Date(b.startDate) : null;
   if (startDateObj) startDateObj.setHours(0, 0, 0, 0);
   const canModify =
-    (b.status === "Pending" || b.status === "Accepted") &&
+    (b.status === "pending" || b.status === "accepted") &&
     startDateObj &&
     startDateObj >= today;
 
@@ -271,11 +271,11 @@ export default function BookingDetails() {
 
 function badgeVariant(status) {
   switch (status) {
-    case "Accepted":
+    case "accepted":
       return "success";
-    case "Pending":
+    case "pending":
       return "secondary";
-    case "Cancelled":
+    case "cancelled":
       return "danger";
     default:
       return "secondary";

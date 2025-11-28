@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import pool from '../db/pool.js';
 import requireAuth from '../middleware/auth.js';
+import Booking from '../models/Booking.js';
+import Property from '../models/Property.js';
 
 const router = Router();
 
@@ -9,27 +10,54 @@ router.get('/', requireAuth, async (req, res, next) => {
   try {
     const ownerId = req.session.userId;
 
-    const [recent] = await pool.query(
-      `SELECT b.id, p.title, b.start_date AS startDate, b.end_date AS endDate, b.guests, b.status
-         FROM bookings b
-         JOIN properties p ON p.id = b.property_id
-        WHERE p.owner_id = ?
-        ORDER BY b.created_at DESC
-        LIMIT 10`,
-      [ownerId]
-    );
+    // Find properties owned by this user
+    const properties = await Property.find({ ownerId }).select('_id title');
+    const propertyIds = properties.map(p => p._id);
 
-    const [previous] = await pool.query(
-      `SELECT b.id, p.title, b.start_date AS startDate, b.end_date AS endDate, b.guests, b.status
-         FROM bookings b
-         JOIN properties p ON p.id = b.property_id
-        WHERE p.owner_id = ? AND b.end_date < CURDATE() AND b.status='Accepted'
-        ORDER BY b.end_date DESC
-        LIMIT 10`,
-      [ownerId]
-    );
+    if (propertyIds.length === 0) {
+      return res.json({ recentRequests: [], previousBookings: [] });
+    }
 
-    res.json({ recentRequests: recent, previousBookings: previous });
+    // Recent requests (Pending/Accepted)
+    const recent = await Booking.find({
+      propertyId: { $in: propertyIds }
+    })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .populate('propertyId', 'title')
+      .lean();
+
+    // Normalize for frontend
+    const recentNormalized = recent.map(b => ({
+      id: b._id,
+      title: b.propertyId?.title,
+      startDate: b.startDate,
+      endDate: b.endDate,
+      guests: b.guests,
+      status: b.status
+    }));
+
+    // Previous bookings (Accepted and past date)
+    const previous = await Booking.find({
+      propertyId: { $in: propertyIds },
+      endDate: { $lt: new Date() },
+      status: 'ACCEPTED'
+    })
+      .sort({ endDate: -1 })
+      .limit(10)
+      .populate('propertyId', 'title')
+      .lean();
+
+    const previousNormalized = previous.map(b => ({
+      id: b._id,
+      title: b.propertyId?.title,
+      startDate: b.startDate,
+      endDate: b.endDate,
+      guests: b.guests,
+      status: b.status
+    }));
+
+    res.json({ recentRequests: recentNormalized, previousBookings: previousNormalized });
   } catch (e) { next(e); }
 });
 

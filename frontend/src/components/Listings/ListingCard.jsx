@@ -2,14 +2,14 @@ import "./ListingCard.css";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { travelerApi } from "../../services/api";
 
-const OWNER_API_BASE = process.env.REACT_APP_OWNER_API || "";
+const OWNER_API_BASE = process.env.REACT_APP_OWNER_API || "http://localhost:8001";
 
 function resolvePhoto(src) {
   if (!src || typeof src !== "string") return null;
   if (src.startsWith("/uploads/")) {
     return `${OWNER_API_BASE}${src}`;
   }
-  return src; 
+  return src;
 }
 
 export default function ListingCard({ item, isFavorite = false, onToggleFavorite }) {
@@ -86,7 +86,7 @@ export default function ListingCard({ item, isFavorite = false, onToggleFavorite
           {type && <div className="text-muted small mb-1 text-truncate">{type}</div>}
           {locationLine && <div className="text-muted small text-truncate">{locationLine}</div>}
 
-        <div className="mt-2 small text-muted">
+          <div className="mt-2 small text-muted">
             {beds != null && <span className="me-2">{beds} bd</span>}
             {baths != null && <span className="me-2">{baths} ba</span>}
             {cap != null && <span className="me-2">{cap} guests</span>}

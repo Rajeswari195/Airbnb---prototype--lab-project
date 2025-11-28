@@ -1,191 +1,164 @@
 // backend/traveler/src/routes/users.js
-import { Router } from 'express';
-import multer from 'multer';
-import path from 'path';
-import Joi from 'joi';
-import { fileURLToPath } from 'url';
-
-import requireAuth from '../middleware/auth.js';
-import User from '../models/User.js';   // 🔹 Mongo traveler profile
-import pool from '../db/pool.js';       // 🔹 MySQL pool (for role/source of truth)
+import { Router } from "express";
+import User from "../models/User.js";
+import requireAuth from "../middleware/auth.js";
 
 const router = Router();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Multer storage for avatar uploads
-const uploadDir = path.resolve(__dirname, '..', '..', 'uploads');
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `avatar_${req.session.userId}_${Date.now()}${ext}`);
-  },
-});
-const upload = multer({ storage });
-
-const allowedCountries = [
-  'United States', 'Canada', 'India', 'United Kingdom', 'Australia',
-  'Germany', 'France', 'Singapore', 'Japan', 'Mexico'
-];
-
-const profileSchema = Joi.object({
-  name: Joi.string().min(2).max(80).required(),
-  email: Joi.string().email().required(),
-  phone: Joi.string().allow(''),
-  about: Joi.string().max(500).allow(''),
-  city: Joi.string().allow(''),
-  state: Joi.string().uppercase().length(2).allow(''), // abbreviated
-  country: Joi.string().valid(...allowedCountries).allow(''),
-  languages: Joi.array().items(Joi.string()).default([]),
-  gender: Joi.string().valid('Female', 'Male', 'Non-binary', 'Prefer not to say', '').allow(''),
-});
-
-/**
- * Helper: get role from MySQL by email (source of truth for owner/traveler).
- * If anything fails, it returns null and we fall back to Mongo's role.
- */
-async function getRoleFromMySQL(email) {
-  if (!email) return null;
-  try {
-    const [rows] = await pool.query(
-      'SELECT role FROM users WHERE email = ? LIMIT 1',
-      [email]
-    );
-    if (rows.length && rows[0].role) {
-      return rows[0].role;
-    }
-  } catch (err) {
-    console.error('[Traveler users] Failed to read role from MySQL:', err.message);
-  }
-  return null;
+function getMongoIdFromSession(req) {
+  if (!req.session) return null;
+  return (
+    req.session.mongoUserId ||
+    (req.session.user && req.session.user.id) ||
+    req.session.userId ||
+    null
+  );
 }
 
 /**
  * GET /api/users/me
- * 🔹 Reads traveler profile from MongoDB User document.
- * 🔹 Role is resolved from MySQL if possible (so owner-role flip is visible in UI).
  */
-router.get('/me', requireAuth, async (req, res, next) => {
+router.get("/me", requireAuth, async (req, res) => {
   try {
-    const uid = req.session.userId;
+    const mongoId = getMongoIdFromSession(req);
+    if (!mongoId) return res.status(401).json({ error: "Unauthorized" });
 
-    const user = await User.findById(uid).lean();
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    const user = await User.findById(mongoId).lean();
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    // Prefer MySQL role (where /api/host/enable updates role to 'owner')
-    let role = user.role || 'traveler';
-    const mysqlRole = await getRoleFromMySQL(user.email);
-    if (mysqlRole) {
-      role = mysqlRole;
-    }
-
-    const payload = {
-      id: String(user._id),
-      name: user.name || '',
+    return res.json({
+      id: user._id,
       email: user.email,
-      phone: user.phone || '',
-      about: user.about || '',
-      city: user.city || '',
-      state: user.state || '',
-      country: user.country || '',
-      languages: Array.isArray(user.languages) ? user.languages : [],
-      gender: user.gender || '',
-      avatarUrl: user.avatarUrl || '',
-      role,
-    };
-
-    return res.json(payload);
+      name: user.name,
+      role: user.role || "traveler",
+      about: user.about || "",
+      city: user.city || "",
+      state: user.state || "",
+      country: user.country || "",
+      phone: user.phone || "",
+      languages: user.languages || [],
+      gender: user.gender || "",
+      avatarUrl: user.avatar_url || user.avatarUrl || "",
+    });
   } catch (err) {
-    return next(err);
+    console.error(">>> [USERS] GET /me error:", err);
+    return res.status(500).json({ error: "Could not fetch profile" });
   }
 });
 
 /**
  * PUT /api/users/me
- * 🔹 Updates profile fields in MongoDB User document.
- *    Returns the updated profile object (same shape as GET /me).
  */
-router.put('/me', requireAuth, async (req, res, next) => {
+router.put("/me", requireAuth, async (req, res) => {
   try {
-    const uid = req.session.userId;
-    const payload = await profileSchema.validateAsync(req.body, { abortEarly: false });
+    const mongoId = getMongoIdFromSession(req);
+    if (!mongoId) return res.status(401).json({ error: "Unauthorized" });
 
-    const update = {
-      name: payload.name,
-      email: payload.email,
-      phone: payload.phone || '',
-      about: payload.about || '',
-      city: payload.city || '',
-      state: payload.state || '',
-      country: payload.country || '',
-      languages: payload.languages || [],
-      gender: payload.gender || '',
-    };
-
-    const user = await User.findByIdAndUpdate(uid, update, {
-      new: true,
-      runValidators: false,
-    }).lean();
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    const allowedFields = [
+      "name",
+      "about",
+      "city",
+      "state",
+      "country",
+      "phone",
+      "languages",
+      "gender",
+    ];
+    const updates = {};
+    for (const f of allowedFields) {
+      if (Object.prototype.hasOwnProperty.call(req.body, f)) {
+        updates[f] = req.body[f];
+      }
     }
 
-    // Again, resolve latest role from MySQL if present
-    let role = user.role || 'traveler';
-    const mysqlRole = await getRoleFromMySQL(user.email);
-    if (mysqlRole) {
-      role = mysqlRole;
+    const user = await User.findByIdAndUpdate(
+      mongoId,
+      { $set: updates },
+      { new: true }
+    ).lean();
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (req.session.user) {
+      req.session.user.name = user.name;
     }
 
-    const response = {
-      id: String(user._id),
-      name: user.name || '',
+    return res.json({
+      id: user._id,
       email: user.email,
-      phone: user.phone || '',
-      about: user.about || '',
-      city: user.city || '',
-      state: user.state || '',
-      country: user.country || '',
-      languages: Array.isArray(user.languages) ? user.languages : [],
-      gender: user.gender || '',
-      avatarUrl: user.avatarUrl || '',
-      role,
-    };
-
-    return res.json(response);
+      name: user.name,
+      role: user.role || "traveler",
+      about: user.about || "",
+      city: user.city || "",
+      state: user.state || "",
+      country: user.country || "",
+      phone: user.phone || "",
+      languages: user.languages || [],
+      gender: user.gender || "",
+      avatarUrl: user.avatar_url || user.avatarUrl || "",
+    });
   } catch (err) {
-    // Duplicate email
-    if (err && err.code === 11000) {
-      return res.status(409).json({ error: 'Email already in use' });
-    }
-    // Joi validation errors
-    if (err && err.isJoi) {
-      return res.status(400).json({ error: 'Validation failed', details: err.details });
-    }
-    return next(err);
+    console.error(">>> [USERS] PUT /me error:", err);
+    return res.status(500).json({ error: "Could not update profile" });
   }
 });
 
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// Setup Multer Storage
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDir = path.join(__dirname, '../../uploads');
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
+
 /**
  * POST /api/users/me/avatar
- * 🔹 Saves avatar file to disk and stores URL path in Mongo User document.
+ * Uploads a profile picture and updates the user record.
  */
-router.post('/me/avatar', requireAuth, upload.single('file'), async (req, res, next) => {
+router.post('/me/avatar', requireAuth, upload.single('avatar'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const mongoId = getMongoIdFromSession(req);
+    if (!mongoId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const urlPath = `/uploads/${req.file.filename}`;
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
 
-    await User.findByIdAndUpdate(req.session.userId, { avatarUrl: urlPath });
+    // Construct public URL (assuming app.js serves /uploads)
+    const avatarUrl = `/uploads/${req.file.filename}`;
 
-    return res.json({ avatarUrl: urlPath });
+    const user = await User.findByIdAndUpdate(
+      mongoId,
+      { $set: { avatarUrl: avatarUrl } },
+      { new: true }
+    ).lean();
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json({
+      avatarUrl: user.avatarUrl
+    });
   } catch (err) {
-    return next(err);
+    console.error('>>> [USERS] Avatar upload error:', err);
+    res.status(500).json({ error: 'Could not upload avatar' });
   }
 });
 

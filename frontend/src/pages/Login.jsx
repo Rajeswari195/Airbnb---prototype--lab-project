@@ -1,26 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { travelerApi, ownerApi } from "../services/api";
+import { ownerApi, travelerApi } from "../services/api";
 import "./Login.css";
 
 // ✅ Redux imports
-import { useDispatch } from "react-redux";
-import { setAuth } from "../features/auth/authSlice";
+import { useDispatch, useSelector } from "react-redux";
+import { loginUser } from "../store/slices/authSlice";
 
 const HOST_INTENT_KEY = "host_intent";
 
 export default function Login() {
   const dispatch = useDispatch();
+  const { loading, error, user } = useSelector((state) => state.auth);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
   const pending = location.state || null;
 
-  // ✅ now accepts an optional existingToken so we don’t call sessionToken twice
+  // Effect to handle successful login redirection
+  useEffect(() => {
+    console.log(">>> [Login] User state changed:", user);
+    if (user) {
+      console.log(">>> [Login] User is logged in. Calling handlePostLogin...");
+      handlePostLogin();
+    }
+  }, [user]);
+
   async function completeHostFlowIfNeeded(existingToken) {
     const hasLocalIntent = localStorage.getItem(HOST_INTENT_KEY) === "1";
     const hasStateIntent = pending && pending.intent === "host";
@@ -37,68 +44,53 @@ export default function Login() {
     return true;
   }
 
+  async function handlePostLogin() {
+    // 4) Host-intent flow
+    // We need token for host flow. loginUser thunk returns user, but we might need to fetch token separately or store it in state.
+    // For now, let's fetch session token again if needed, or assume cookie is set.
+    let token = null;
+    try {
+      const session = await travelerApi.sessionToken();
+      token = session?.token || null;
+    } catch { }
+
+    const wentHost = await completeHostFlowIfNeeded(token);
+    if (wentHost) {
+      navigate("/owner", { replace: true });
+      return;
+    }
+
+    // 5) Pending favorite flow
+    if (pending && pending.intent === "favorite" && pending.propertyId) {
+      try {
+        await travelerApi.addFavorite(Number(pending.propertyId));
+      } catch { }
+      navigate(pending.from || "/", { replace: true });
+      return;
+    }
+
+    // 6) Pending booking flow
+    if (
+      pending &&
+      pending.intent === "booking" &&
+      pending.propertyId &&
+      pending.startDate &&
+      pending.endDate &&
+      pending.guests
+    ) {
+      const url = `/booking-request?propertyId=${pending.propertyId}&startDate=${pending.startDate}&endDate=${pending.endDate}&guests=${pending.guests}`;
+      navigate(url, { replace: true });
+      return;
+    }
+
+    // 7) Default redirect
+    console.log(">>> [Login] No specific intent found. Redirecting to /profile...");
+    navigate("/profile", { replace: true });
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
-    setLoading(true);
-    setErr("");
-    try {
-      // 1) Normal login
-      await travelerApi.login({ email, password });
-
-      // 2) Get JWT/session token once (if backend exposes it)
-      let token = null;
-      try {
-        const session = await travelerApi.sessionToken();
-        token = session?.token || null;
-      } catch {
-        // ignore; we still mark user as authenticated in Redux
-      }
-
-      // 3) Store auth in Redux
-      dispatch(
-        setAuth({
-          token,
-          role: "TRAVELER",
-        })
-      );
-
-      // 4) Host-intent flow (reuse token if we have it)
-      const wentHost = await completeHostFlowIfNeeded(token);
-      if (wentHost) {
-        navigate("/owner", { replace: true });
-        return;
-      }
-
-      // 5) Pending favorite flow
-      if (pending && pending.intent === "favorite" && pending.propertyId) {
-        try {
-          await travelerApi.addFavorite(Number(pending.propertyId));
-        } catch {}
-        navigate(pending.from || "/", { replace: true });
-        return;
-      }
-
-      // 6) Pending booking flow
-      if (
-        pending &&
-        pending.intent === "booking" &&
-        pending.propertyId &&
-        pending.startDate &&
-        pending.endDate &&
-        pending.guests
-      ) {
-        const url = `/booking-request?propertyId=${pending.propertyId}&startDate=${pending.startDate}&endDate=${pending.endDate}&guests=${pending.guests}`;
-        navigate(url, { replace: true });
-        return;
-      }
-
-      // 7) Default redirect
-      navigate("/", { replace: true });
-    } catch (e) {
-      setErr(e.message || "Login failed");
-    } finally {
-      setLoading(false);
-    }
+    dispatch(loginUser({ email, password }));
   }
 
   return (
@@ -108,7 +100,7 @@ export default function Login() {
 
         <h1 className="auth-title">Welcome to Airbnb</h1>
 
-        {err && <div className="alert alert-danger py-2">{err}</div>}
+        {error && <div className="alert alert-danger py-2">{error}</div>}
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="mb-3">

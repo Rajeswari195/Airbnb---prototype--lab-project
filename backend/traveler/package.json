@@ -19,17 +19,16 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "express-mysql-session": "^3.0.3",
     "express-session": "^1.18.2",
     "joi": "^18.0.1",
     "jsonwebtoken": "^9.0.2",
     "kafkajs": "^2.2.4",
-    "mongoose": "^8.20.0",
+    "mongoose": "^8.20.1",
     "multer": "^2.0.2",
-    "mysql2": "^3.15.2",
     "open": "^10.2.0",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

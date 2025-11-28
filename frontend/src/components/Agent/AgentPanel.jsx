@@ -34,16 +34,24 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
   const [err, setErr] = useState("");
   const [plan, setPlan] = useState(null);
 
+  // Destructure defaults to avoid object reference instability in useEffect
+  const {
+    location: defLoc,
+    startDate: defStart,
+    endDate: defEnd,
+    guests: defGuests,
+  } = defaults;
+
   // reset from defaults when panel opens
   useEffect(() => {
     if (open) {
-      setLocation(defaults.location || "");
-      setStart(trimDate(defaults.startDate));
-      setEnd(trimDate(defaults.endDate));
-      if (defaults.guests) setAdults(String(defaults.guests));
+      setLocation(defLoc || "");
+      setStart(trimDate(defStart));
+      setEnd(trimDate(defEnd));
+      if (defGuests) setAdults(String(defGuests));
       setErr("");
     }
-  }, [open, defaults]);
+  }, [open, defLoc, defStart, defEnd, defGuests]);
 
   // auto-fill from traveler's upcoming accepted booking
   useEffect(() => {
@@ -58,7 +66,7 @@ export default function AgentPanel({ open, onClose, defaults = {} }) {
         today.setHours(0, 0, 0, 0);
 
         const futureAccepted = all.filter((b) => {
-          if (b.status !== "Accepted" || !b.startDate) return false;
+          if (b.status.toLowerCase() !== "accepted" || !b.startDate) return false;
           const d = new Date(b.startDate);
           d.setHours(0, 0, 0, 0);
           return d >= today;

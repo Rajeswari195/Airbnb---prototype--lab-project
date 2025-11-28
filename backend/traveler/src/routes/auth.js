@@ -1,75 +1,68 @@
 // backend/traveler/src/routes/auth.js
 import { Router } from 'express';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 import User from '../models/User.js';
 import requireAuth from '../middleware/auth.js';
-import pool from '../db/pool.js';            // 👈 NEW: MySQL pool
 
 const router = Router();
 
 /**
- * Helper: create or update a MySQL profile row for this traveler.
- * - id is the Mongo _id string
- * - keeps email/name in sync
+ * Helper: store traveler session consistently
  */
-async function syncTravelerProfileToMySQL(mongoUser) {
-  const uid = String(mongoUser._id);
-  const name = mongoUser.name || '';
-  const email = mongoUser.email;
-  const role = mongoUser.role || 'traveler';
+function setTravelerSession(req, user) {
+  const mongoId = user._id.toString();
 
-  try {
-    // Use ON DUPLICATE KEY so this works for both signup and re-signup cases
-    await pool.query(
-      `
-      INSERT INTO users (id, name, email, role)
-      VALUES (?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        name = VALUES(name),
-        email = VALUES(email),
-        role = VALUES(role)
-      `,
-      [uid, name, email, role]
-    );
-    console.log('>>> [AUTH] MySQL profile synced for traveler id =', uid);
-  } catch (err) {
-    console.error('>>> [AUTH] MySQL sync error:', err);
-    // IMPORTANT: do NOT throw, auth should still succeed
-  }
+  req.session.userId = mongoId;
+  req.session.mongoUserId = mongoId;
+  req.session.role = 'traveler';
+  req.session.user = {
+    id: mongoId,
+    email: user.email,
+    name: user.name,
+    role: 'traveler'
+  };
 }
 
 /**
  * POST /api/auth/signup
- * Traveler signup: stores user in MongoDB with encrypted password,
- * then syncs a profile row into MySQL `users` table.
  */
 router.post('/signup', async (req, res, next) => {
-  console.log('>>> [AUTH] Mongo SIGNUP handler reached, body =', req.body);
   try {
     const { name, email, password } = req.body || {};
+
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'name, email, password required' });
     }
 
-    // Check if traveler already exists in Mongo
     const existing = await User.findOne({ email, role: 'traveler' });
     if (existing) {
       console.log('>>> [AUTH] Existing traveler found in Mongo for', email);
       return res.status(409).json({ error: 'Email already in use' });
     }
 
-    // Hash password with bcrypt
-    const passwordHash = await bcrypt.hash(password, 10);
+    // Password hashing is handled by pre-save hook in User model, 
+    // BUT the previous code hashed it manually. 
+    // The User model I created has a pre-save hook.
+    // So I should pass plain password if I use User.create, OR hash it if I want to be explicit.
+    // The User model I created in Step 88 has:
+    // userSchema.pre('save', async function(next) { ... if (!this.isModified('password')) return next(); ... bcrypt.hash ... })
+    // So I can just pass 'password'.
+    // However, to be safe and consistent with the previous code which might have expected hashed,
+    // let's check the User model again. 
+    // Step 88: 
+    // userSchema.pre('save', ... this.password = await bcrypt.hash(this.password, 10); ...)
+    // So if I pass plain password, it will be hashed.
 
-    // Create traveler user in Mongo
-    const user = await User.create({
+    const user = new User({
       name,
       email,
-      passwordHash,
+      password, // Plain text, will be hashed by pre-save
       role: 'traveler'
     });
+    console.log('>>> [AUTH] Saving new user with plain password:', password);
+    await user.save();
 
     console.log('>>> [AUTH] Mongo traveler created:', {
       _id: user._id,
@@ -77,19 +70,13 @@ router.post('/signup', async (req, res, next) => {
       role: user.role
     });
 
-    // ✅ Sync profile into MySQL (non-blocking for auth success)
-    await syncTravelerProfileToMySQL(user);
-
-    // Store session info (Mongo-backed session store)
-    req.session.userId = user._id.toString();
-    req.session.role = 'traveler';
+    setTravelerSession(req, user);
 
     res.status(201).json({
       id: String(user._id),
-      source: 'traveler-mongo-auth',
-      name: user.name,
       email: user.email,
-      role: 'traveler'
+      name: user.name,
+      role: user.role
     });
   } catch (err) {
     console.error('>>> [AUTH] SIGNUP error:', err);
@@ -99,56 +86,33 @@ router.post('/signup', async (req, res, next) => {
 
 /**
  * POST /api/auth/login
- * Traveler login: verifies Mongo user with bcrypt and sets session,
- * then backfills MySQL `users` row if it does not exist yet.
  */
 router.post('/login', async (req, res, next) => {
-  console.log('>>> [AUTH] Mongo LOGIN handler reached, body =', req.body);
   try {
     const { email, password } = req.body || {};
+
     if (!email || !password) {
-      return res.status(400).json({ error: 'email, password required' });
+      return res.status(400).json({ error: 'email and password required' });
     }
 
-    // Find traveler in Mongo
-    const user = await User.findOne({ email, role: 'traveler' });
+    const user = await User.findOne({ email });
     if (!user) {
-      console.log('>>> [AUTH] No Mongo traveler for email', email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) {
-      console.log('>>> [AUTH] Password mismatch for email', email);
+    // Use the method on the user instance
+    const match = await user.comparePassword(password);
+    if (!match) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Set Mongo-backed session
-    req.session.userId = user._id.toString();
-    req.session.role = user.role || 'traveler';
-
-    // ✅ Backfill MySQL profile row if missing (for users created before sync existed)
-    try {
-      const uid = String(user._id);
-      const [rows] = await pool.query(
-        'SELECT id FROM users WHERE id = ?',
-        [uid]
-      );
-      if (!rows.length) {
-        console.log('>>> [AUTH] No MySQL profile for traveler id =', uid, '—creating now');
-        await syncTravelerProfileToMySQL(user);
-      }
-    } catch (err) {
-      console.error('>>> [AUTH] MySQL backfill error on login:', err);
-      // Do NOT fail login if this breaks
-    }
+    setTravelerSession(req, user);
 
     res.json({
       id: String(user._id),
-      source: 'traveler-mongo-auth',
-      name: user.name,
       email: user.email,
-      role: req.session.role
+      name: user.name,
+      role: user.role
     });
   } catch (err) {
     console.error('>>> [AUTH] LOGIN error:', err);
@@ -158,7 +122,6 @@ router.post('/login', async (req, res, next) => {
 
 /**
  * POST /api/auth/logout
- * Clears the session and cookie.
  */
 router.post('/logout', (req, res) => {
   console.log('>>> [AUTH] LOGOUT called');
@@ -173,28 +136,48 @@ router.post('/logout', (req, res) => {
 });
 
 /**
- * POST /api/auth/session-token
- * Returns a short-lived token (120s) representing the current session
- * for Owner API to exchange and set its own session.
+ * GET /api/auth/session
  */
-router.post('/session-token', requireAuth, (req, res) => {
-  console.log('>>> [AUTH] SESSION-TOKEN for userId =', req.session.userId);
-  const payload = {
-    id: req.session.userId,
-    role: req.session.role || 'traveler'
-  };
+router.get('/session', (req, res) => {
+  if (!req.session || !req.session.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  res.json(req.session.user);
+});
 
-  const token = jwt.sign(
-    payload,
-    process.env.SSO_JWT_SECRET || 'dev_sso_secret',
-    {
-      expiresIn: '120s',
-      issuer: 'traveler-api',
-      audience: 'owner-api'
+/**
+ * POST /api/auth/session-token
+ * Short-lived JWT for owner SSO.
+ */
+router.post('/session-token', requireAuth, async (req, res) => {
+  try {
+    const mongoId = req.session.mongoUserId || req.session.userId;
+    const user = await User.findById(mongoId);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-  );
 
-  res.json({ token });
+    const payload = {
+      id: mongoId,
+      role: 'traveler'
+    };
+
+    const token = jwt.sign(
+      payload,
+      process.env.SSO_JWT_SECRET || 'dev_sso_secret',
+      {
+        expiresIn: '120s',
+        issuer: 'traveler-api',
+        audience: 'owner-api'
+      }
+    );
+
+    res.json({ token });
+  } catch (err) {
+    console.error('>>> [AUTH] SESSION-TOKEN error:', err);
+    res.status(500).json({ error: 'Could not generate token' });
+  }
 });
 
 export default router;

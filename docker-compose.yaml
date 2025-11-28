@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.2
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.2
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  traveler:
+    build: ./backend/traveler
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - MONGO_URI=mongodb://mongo:27017/airbnb
+      - KAFKA_BROKER=kafka:29092
+      - JWT_SECRET=dev_secret
+      - SSO_JWT_SECRET=dev_sso_secret
+    depends_on:
+      - mongo
+      - kafka
+
+  owner:
+    build: ./backend/owner
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - MONGO_URI=mongodb://mongo:27017/airbnb
+      - KAFKA_BROKER=kafka:29092
+      - JWT_SECRET=dev_secret
+      - SSO_JWT_SECRET=dev_sso_secret
+    depends_on:
+      - mongo
+      - kafka
+
+  property:
+    build: ./backend/property
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+      - MONGO_URI=mongodb://mongo:27017/airbnb
+    depends_on:
+      - mongo
+
+  booking:
+    build: ./backend/booking
+    ports:
+      - "8003:8003"
+    environment:
+      - PORT=8003
+      - MONGO_URI=mongodb://mongo:27017/airbnb
+      - KAFKA_BROKER=kafka:29092
+      - JWT_SECRET=dev_secret
+    depends_on:
+      - mongo
+      - kafka
+
+  agent:
+    build: ./agent
+    ports:
+      - "8500:8500"
+    environment:
+      - AGENT_PORT=8500
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:8500
+    depends_on:
+      - traveler
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_BASE_URL=http://localhost:8000/api
+      - REACT_APP_AGENT_BASE=http://localhost:8500
+    depends_on:
+      - traveler
+      - agent
+
+volumes:
+  mongo_data:

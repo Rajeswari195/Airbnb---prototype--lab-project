@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: owner-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: owner
+  template:
+    metadata:
+      labels:
+        app: owner
+    spec:
+      containers:
+      - name: owner
+        image: docker.io/rajeswari1929/owner-service:lab2
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8001
+        env:
+        - name: PORT
+          value: "8001"
+        - name: MONGO_URI
+          value: "mongodb://mongo-service:27017/airbnb"
+        - name: BOOKING_TOPIC
+          value: "booking.status"
+        - name: KAFKA_BROKERS
+          value: "kafka-service:9092"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: owner-service
+spec:
+  selector:
+    app: owner
+  ports:
+    - protocol: TCP
+      port: 8001
+      targetPort: 8001

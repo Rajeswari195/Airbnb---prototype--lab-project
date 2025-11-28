@@ -1,45 +1,297 @@
-import "./HostModal.css";
+// frontend/.../Navbar.jsx
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import HostModal from "./HostModal";
+import "./Navbar.css";
+import { travelerApi, ownerApi } from "../services/api";
 
-export default function HostModal({ onClose }) {
-  const handleChoose = () => onClose();
+const HOST_INTENT_KEY = "host_intent";
+
+export default function Navbar() {
+  const [showMenu, setShowMenu] = useState(false);
+  const [showHost, setShowHost] = useState(false);
+  const [authed, setAuthed] = useState(false);
+  const [user, setUser] = useState(null);
+  const menuRef = useRef(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    function onDocClick(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  async function checkSession() {
+    try {
+      const me = await travelerApi.me();
+      setAuthed(true);
+      setUser(me || null);
+    } catch {
+      setAuthed(false);
+      setUser(null);
+    }
+  }
+
+  useEffect(() => {
+    checkSession();
+  }, [location.pathname]);
+
+  function toggleMenu() {
+    const next = !showMenu;
+    setShowMenu(next);
+    if (next) checkSession();
+  }
+
+  async function handleLogout() {
+    try {
+      await travelerApi.logout();
+    } catch (_) {}
+    setAuthed(false);
+    setUser(null);
+    setShowMenu(false);
+    navigate("/");
+  }
+
+  const initial =
+    ((user?.name || user?.email || "").trim()[0] || "").toUpperCase() || "U";
+  const inHostArea = location.pathname.startsWith("/owner");
+
+  const hostUIMode = inHostArea || !!location.state?.hostMode;
+
+  // --- SSO helpers ---------------------------------------------------------
+
+  async function ensureOwnerSession() {
+    console.log("[HOST] ensureOwnerSession: requesting session token from traveler");
+    const { token } = await travelerApi.sessionToken();
+    console.log("[HOST] ensureOwnerSession: got token:", token ? "yes" : "no");
+    const exchangeRes = await ownerApi.exchange(token);
+    console.log("[HOST] ensureOwnerSession: owner exchange OK:", exchangeRes);
+  }
+
+  async function confirmOwnerReady() {
+    console.log("[HOST] confirmOwnerReady: checking owner dashboard");
+    try {
+      await ownerApi.dashboard();
+      console.log("[HOST] confirmOwnerReady: owner dashboard OK");
+    } catch (err) {
+      console.warn(
+        "[HOST] confirmOwnerReady: first dashboard check failed, retrying...",
+        err
+      );
+      await new Promise((r) => setTimeout(r, 150));
+      await ownerApi.dashboard();
+      console.log("[HOST] confirmOwnerReady: owner dashboard OK after retry");
+    }
+  }
+
+  // --- Host CTA ------------------------------------------------------------
+
+  async function onHostCtaClick() {
+    console.log("[HOST] CTA clicked. authed =", authed, "path =", location.pathname);
+
+    // Not logged in → remember intent and go to login
+    if (!authed) {
+      console.log("[HOST] Not authed → storing host_intent and going to /login");
+      localStorage.setItem(HOST_INTENT_KEY, "1");
+      // If already on /login, this will look like "nothing happens"
+      if (location.pathname !== "/login") {
+        navigate("/login");
+      }
+      return;
+    }
+
+    // Already in host area → switch back to traveler view
+    if (inHostArea) {
+      console.log("[HOST] Already in host area → going back to /");
+      navigate("/");
+      return;
+    }
+
+    // Traveler view → enable host + go to /owner
+    try {
+      console.log("[HOST] Enabling host for user:", user?.email);
+      await ensureOwnerSession();
+      const enableRes = await ownerApi.enableHost();
+      console.log("[HOST] enableHost response:", enableRes);
+      await confirmOwnerReady();
+      console.log("[HOST] Navigation to /owner");
+      navigate("/owner");
+    } catch (err) {
+      console.error("[HOST] Error while enabling host:", err);
+      alert("Could not switch to host. Check console/network for details.");
+      // keep the user where they are so you SEE the error instead of silently
+      // bouncing back to /login; if you really want old behavior, you can
+      // re-add navigate("/login") here.
+      // localStorage.setItem(HOST_INTENT_KEY, "1");
+      // navigate("/login");
+    }
+  }
+
+  const hostCtaLabel = !authed
+    ? "Become a host"
+    : inHostArea
+    ? "Switch to traveler"
+    : "Become a host";
+
+  // --- Render --------------------------------------------------------------
+
   return (
-    <div className="host-modal-backdrop">
-      <div className="host-modal-card">
-        <button
-          className="btn btn-link text-dark host-close"
-          onClick={onClose}
-          aria-label="Close"
-        >
-          <i className="bi bi-x-lg"></i>
-        </button>
+    <>
+      <header className="border-bottom bg-white">
+        <div className="container py-3 nav-grid">
+          <div className="nav-left">
+            <NavLink to="/" className="text-decoration-none align-self-center">
+              <span className="fw-bold fs-4 text-danger">airbnb</span>
+            </NavLink>
+          </div>
 
-        <h2 className="text-center mb-4">What would you like to host?</h2>
+          <nav className="nav-center">
+            <NavItem to="/" exact icon="bi-house-door-fill" label="Homes" />
+            <NavItem
+              to="/experiences"
+              icon="bi-balloon-heart-fill"
+              label="Experiences"
+            />
+            <NavItem to="/services" icon="bi-bell-fill" label="Services" />
+          </nav>
 
-        <div className="container">
-          <div className="row g-4">
-            <div className="col-12 col-md-4">
-              <button className="host-card w-100" onClick={handleChoose}>
-                <i className="bi bi-house-door-fill host-icon"></i>
-                <div className="host-title">Home</div>
+          <div className="nav-right">
+            <button
+              className="btn btn-link text-decoration-none text-dark fw-semibold px-3 nav-host"
+              onClick={onHostCtaClick}
+            >
+              {hostCtaLabel}
+            </button>
+
+            {authed ? (
+              <button
+                className="btn border circle-btn nav-avatar"
+                title="Profile"
+                onClick={() =>
+                  navigate("/profile", {
+                    state: inHostArea ? { hostMode: true } : undefined,
+                  })
+                }
+              >
+                <span>{initial}</span>
               </button>
-            </div>
-
-            <div className="col-12 col-md-4">
-              <button className="host-card w-100" onClick={handleChoose}>
-                <i className="bi bi-balloon-heart-fill host-icon"></i>
-                <div className="host-title">Experience</div>
+            ) : (
+              <button
+                className="btn btn-light border circle-btn nav-icon"
+                title="Language"
+              >
+                <i className="bi bi-globe"></i>
               </button>
-            </div>
+            )}
 
-            <div className="col-12 col-md-4">
-              <button className="host-card w-100" onClick={handleChoose}>
-                <i className="bi bi-bell-fill host-icon"></i>
-                <div className="host-title">Service</div>
+            <div className="position-relative" ref={menuRef}>
+              <button
+                className="btn btn-light border rounded-pill d-flex align-items-center gap-2 px-3 nav-menu"
+                onClick={toggleMenu}
+                aria-expanded={showMenu}
+                aria-haspopup="true"
+              >
+                <i className="bi bi-list"></i>
               </button>
+
+              <div
+                className={`dropdown-menu dropdown-menu-end shadow ${
+                  showMenu ? "show" : ""
+                }`}
+                style={{ right: 0, left: "auto" }}
+              >
+                {!authed && (
+                  <>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setShowMenu(false);
+                        localStorage.setItem(HOST_INTENT_KEY, "1");
+                        navigate("/login");
+                      }}
+                    >
+                      Become a host
+                    </button>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setShowMenu(false);
+                        navigate("/login");
+                      }}
+                    >
+                      Log in or Sign up
+                    </button>
+                    <div className="dropdown-divider"></div>
+                    <a className="dropdown-item" href="#help">
+                      Help Center
+                    </a>
+                  </>
+                )}
+
+                {authed && (
+                  <>
+                    {!hostUIMode && (
+                      <button
+                        className="dropdown-item"
+                        onClick={() => {
+                          setShowMenu(false);
+                          navigate("/wishlists");
+                        }}
+                      >
+                        Wishlists
+                      </button>
+                    )}
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setShowMenu(false);
+                        navigate("/profile", {
+                          state: inHostArea ? { hostMode: true } : undefined,
+                        });
+                      }}
+                    >
+                      Profile
+                    </button>
+                    <a className="dropdown-item" href="#help">
+                      Help Center
+                    </a>
+                    <div className="dropdown-divider"></div>
+                    <button
+                      className="dropdown-item text-danger"
+                      onClick={handleLogout}
+                    >
+                      Log out
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </header>
+
+      {showHost && <HostModal onClose={() => setShowHost(false)} />}
+    </>
+  );
+}
+
+function NavItem({ to, label, icon, exact }) {
+  return (
+    <NavLink
+      to={to}
+      end={exact ?? false}
+      className={({ isActive }) =>
+        "nav-cat-link d-flex flex-column align-items-center text-center pb-2" +
+        (isActive ? " active" : "")
+      }
+    >
+      <i className={`bi ${icon} nav-cat-icon`}></i>
+      <span className="fw-semibold small">{label}</span>
+    </NavLink>
   );
 }

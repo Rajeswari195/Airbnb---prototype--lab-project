@@ -19,6 +19,7 @@ import userRoutes from './routes/users.js';
 import propertyRoutes from './routes/properties.js';
 import bookingRoutes from './routes/bookings.js';
 import favoritesRoutes from './routes/favorites.js';
+import analyticsRoutes from './routes/analytics.js';
 
 const app = express();
 
@@ -33,8 +34,12 @@ connectMongoTraveler()
   });
 
 // ---- Parsers ----
+// ---- Parsers ----
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+import traceMiddleware from './middleware/trace.js';
+app.use(traceMiddleware);
 
 // ---- CORS ----
 const allowed = [
@@ -45,7 +50,14 @@ const allowed = [
 
 app.use(
   cors({
-    origin: (origin, cb) => cb(null, !origin || allowed.includes(origin)),
+    origin: (origin, cb) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return cb(null, true);
+      if (allowed.indexOf(origin) !== -1 || origin.startsWith('http://localhost')) {
+        return cb(null, true);
+      }
+      return cb(new Error('Not allowed by CORS'));
+    },
     credentials: true,
   })
 );
@@ -67,7 +79,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: false, // Allow HTTP for localhost lab environment
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     },
   })

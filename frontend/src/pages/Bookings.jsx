@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   setStatusFilter,
   fetchBookings,
-} from "../features/bookings/bookingsSlice";
+} from "../store/slices/bookingSlice";
 
 const TABS = ["All", "Pending", "Accepted", "Cancelled"];
 
@@ -28,9 +28,8 @@ export default function Bookings() {
           <button
             key={t}
             type="button"
-            className={`btn btn-sm ${
-              statusFilter === t ? "btn-dark" : "btn-outline-dark"
-            }`}
+            className={`btn btn-sm ${statusFilter === t ? "btn-dark" : "btn-outline-dark"
+              }`}
             onClick={() => dispatch(setStatusFilter(t))}
           >
             {t}
@@ -42,12 +41,12 @@ export default function Bookings() {
 
       {loading && <div>Loading…</div>}
 
-      {!loading && items.length === 0 && !error && (
+      {!loading && (items || []).length === 0 && !error && (
         <div className="text-muted">No bookings to show.</div>
       )}
 
       <div className="row g-4 row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4">
-        {items.map((b) => (
+        {(items || []).map((b) => (
           <div key={b.id} className="col">
             <Link
               to={`/bookings/${b.id}`}

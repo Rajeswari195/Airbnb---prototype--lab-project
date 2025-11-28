@@ -4,6 +4,9 @@ import HostModal from "./HostModal";
 import "./Navbar.css";
 import { travelerApi, ownerApi } from "../services/api";
 
+import { useDispatch } from "react-redux";
+import { logoutUser } from "../store/slices/authSlice";
+
 const HOST_INTENT_KEY = "host_intent";
 
 export default function Navbar() {
@@ -28,8 +31,13 @@ export default function Navbar() {
   async function checkSession() {
     try {
       const me = await travelerApi.me();
-      setAuthed(true);
-      setUser(me || null);
+      if (me) {
+        setAuthed(true);
+        setUser(me);
+      } else {
+        setAuthed(false);
+        setUser(null);
+      }
     } catch {
       setAuthed(false);
       setUser(null);
@@ -46,10 +54,12 @@ export default function Navbar() {
     if (next) checkSession();
   }
 
+  const dispatch = useDispatch();
+
   async function handleLogout() {
     try {
-      await travelerApi.logout();
-    } catch (_) {}
+      await dispatch(logoutUser()).unwrap();
+    } catch (_) { }
     setAuthed(false);
     setUser(null);
     setShowMenu(false);
@@ -105,8 +115,8 @@ export default function Navbar() {
   const hostCtaLabel = !authed
     ? "Become a host"
     : inHostArea
-    ? "Switch to traveler"
-    : "Become a host";
+      ? "Switch to traveler"
+      : "Become a host";
 
   return (
     <>
@@ -168,9 +178,8 @@ export default function Navbar() {
               </button>
 
               <div
-                className={`dropdown-menu dropdown-menu-end shadow ${
-                  showMenu ? "show" : ""
-                }`}
+                className={`dropdown-menu dropdown-menu-end shadow ${showMenu ? "show" : ""
+                  }`}
                 style={{ right: 0, left: "auto" }}
               >
                 {!authed && (

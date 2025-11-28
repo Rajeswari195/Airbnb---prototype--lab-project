@@ -1,5 +1,4 @@
-// backend/booking/kafka/client.js
-const { Kafka } = require('kafkajs');
+import { Kafka } from 'kafkajs';
 
 const broker =
   process.env.KAFKA_BROKER ||
@@ -13,6 +12,6 @@ const kafka = new Kafka({
   brokers: [broker],
 });
 
-module.exports = kafka;
+export default kafka;
 
 

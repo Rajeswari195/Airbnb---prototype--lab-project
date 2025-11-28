@@ -1,13 +1,12 @@
-// /frontend/src/store/index.js
 import { configureStore } from '@reduxjs/toolkit';
-import authReducer from '../features/auth/authSlice';
-import bookingsReducer from '../features/bookings/bookingsSlice';
+import authReducer from './slices/authSlice';
+import propertyReducer from './slices/propertySlice';
+import bookingReducer from './slices/bookingSlice';
 
-const store = configureStore({
+export const store = configureStore({
   reducer: {
     auth: authReducer,
-    bookings: bookingsReducer,
+    properties: propertyReducer,
+    bookings: bookingReducer,
   },
 });
-
-export default store;

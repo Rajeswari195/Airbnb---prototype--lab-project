@@ -1,166 +1,81 @@
 // backend/owner/src/routes/auth.js
-import { Router } from 'express';
-import bcrypt from 'bcryptjs';
-import pool from '../db/pool.js';
-import User from '../models/User.js';
+import { Router } from "express";
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
+import requireAuth from "../middleware/auth.js";
 
 const router = Router();
 
+// shared with traveler
+const SSO_SECRET = process.env.SSO_JWT_SECRET || "dev_sso_secret";
+
 /**
- * POST /api/auth/signup
- * Owner signup:
- *  - Stores owner in MySQL (existing behavior)
- *  - Also stores owner in MongoDB (role = 'owner')
+ * POST /api/auth/exchange
+ * NOTE: NO requireAuth here – this is how the user gets an owner session.
  */
-router.post('/signup', async (req, res, next) => {
-  console.log('>>> [OWNER AUTH] SIGNUP handler reached, body =', req.body);
+router.post("/exchange", async (req, res) => {
   try {
-    const { name, email, password, location } = req.body || {};
-    if (!name || !email || !password || !location) {
-      return res
-        .status(400)
-        .json({ error: 'name, email, password, location required' });
+    const { token } = req.body || {};
+    if (!token) {
+      return res.status(400).json({ error: "Missing token" });
     }
 
-    // Check Mongo for existing owner with same email
-    const existingMongo = await User.findOne({ email, role: 'owner' });
-    if (existingMongo) {
-      console.log('>>> [OWNER AUTH] Existing owner found in Mongo for', email);
-      return res.status(409).json({ error: 'Email already in use' });
+    console.log(">>> [OWNER] EXCHANGE token snippet:", token.slice(0, 16), "...");
+
+    const payload = jwt.verify(token, SSO_SECRET);
+    console.log(">>> [OWNER] EXCHANGE payload:", payload);
+
+    const user = await User.findById(payload.id);
+
+    if (!user) {
+      console.error(">>> [OWNER] EXCHANGE user not found id =", payload.id);
+      return res.status(404).json({ error: "User not found" });
     }
 
-    // Hash password
-    const hash = await bcrypt.hash(password, 10);
+    req.session.userId = user._id.toString();
+    req.session.role = "owner";
+    req.session.user = {
+      id: user._id.toString(),
+      email: user.email,
+      name: user.name,
+      role: "owner",
+    };
 
-    // Insert into MySQL users table
-    const [r] = await pool.query(
-      'INSERT INTO users (name,email,password_hash,role,city) VALUES (?,?,?,?,?)',
-      [name, email, hash, 'owner', location]
-    );
-
-    const ownerId = r.insertId;
-    console.log('>>> [OWNER AUTH] MySQL owner created with id =', ownerId);
-
-    // Create corresponding Mongo user document
-    const mongoUser = await User.create({
-      email,
-      passwordHash: hash,
-      role: 'owner',
-      name,
-      city: location
+    console.log(">>> [OWNER] SSO EXCHANGE success for", user.email);
+    return res.json({
+      ok: true, user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
     });
-
-    console.log('>>> [OWNER AUTH] Mongo owner created:', {
-      _id: mongoUser._id,
-      email: mongoUser.email,
-      role: mongoUser.role
-    });
-
-    // Session uses MySQL owner id (keep existing behavior)
-    req.session.userId = ownerId;
-    req.session.role = 'owner';
-
-    // Response: expose Mongo _id as id, but also show MySQL id
-    res.status(201).json({
-      id: String(mongoUser._id),
-      ownerIdMySQL: ownerId,
-      source: 'owner-mongo-auth', // tag for debugging
-      name,
-      email,
-      location,
-      role: 'owner'
-    });
-  } catch (e) {
-    console.error('>>> [OWNER AUTH] SIGNUP error:', e);
-    next(e);
+  } catch (err) {
+    console.error(">>> [OWNER] EXCHANGE error:", err);
+    return res.status(401).json({ error: "Invalid or expired token" });
   }
 });
 
 /**
- * POST /api/auth/login
- *  - Verifies owner via MySQL (existing behavior)
- *  - Upserts owner into MongoDB
+ * POST /api/host/enable
+ * Flip role to owner.
  */
-router.post('/login', async (req, res, next) => {
-  console.log('>>> [OWNER AUTH] LOGIN handler reached, body =', req.body);
+router.post("/host/enable", requireAuth, async (req, res) => {
   try {
-    const { email, password } = req.body || {};
-    if (!email || !password) {
-      return res.status(400).json({ error: 'email, password required' });
+    const userId = req.session.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Look up owner in MySQL
-    const [rows] = await pool.query(
-      'SELECT id,name,email,password_hash,role,city FROM users WHERE email=?',
-      [email]
-    );
+    await User.findByIdAndUpdate(userId, { role: 'owner' });
 
-    if (!rows.length) {
-      console.log('>>> [OWNER AUTH] No MySQL owner for email', email);
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    req.session.role = "owner";
+    if (req.session.user) req.session.user.role = "owner";
 
-    const u = rows[0];
-
-    if (u.role !== 'owner') {
-      return res.status(403).json({ error: 'Not an owner account' });
-    }
-
-    const ok = await bcrypt.compare(password, u.password_hash);
-    if (!ok) {
-      console.log('>>> [OWNER AUTH] Password mismatch for email', email);
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // Upsert owner into Mongo to keep it synced
-    const mongoOwner = await User.findOneAndUpdate(
-      { email: u.email, role: 'owner' },
-      {
-        email: u.email,
-        passwordHash: u.password_hash,
-        role: 'owner',
-        name: u.name,
-        city: u.city
-      },
-      { upsert: true, new: true }
-    );
-
-    console.log('>>> [OWNER AUTH] Mongo owner upserted:', {
-      _id: mongoOwner._id,
-      email: mongoOwner.email,
-      role: mongoOwner.role
-    });
-
-    // Keep session userId as MySQL id
-    req.session.userId = u.id;
-    req.session.role = 'owner';
-
-    res.json({
-      id: u.id,
-      source: 'owner-mongo-auth', // tag
-      name: u.name,
-      email: u.email,
-      location: u.city,
-      role: 'owner'
-    });
-  } catch (e) {
-    console.error('>>> [OWNER AUTH] LOGIN error:', e);
-    next(e);
-  }
-});
-
-/**
- * POST /api/auth/logout
- */
-router.post('/logout', (req, res) => {
-  console.log('>>> [OWNER AUTH] LOGOUT called');
-  if (req.session) {
-    req.session.destroy(() => {
-      res.clearCookie('owner_sid'); // match cookie name in app.js
-      res.status(204).end();
-    });
-  } else {
-    res.status(204).end();
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(">>> [OWNER] ENABLE error:", err);
+    return res.status(500).json({ error: "Could not enable host" });
   }
 });
 

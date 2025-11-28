@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: property-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: property
+  template:
+    metadata:
+      labels:
+        app: property
+    spec:
+      containers:
+      - name: property
+        image: docker.io/rajeswari1929/property-service:lab2
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8002
+        env:
+        - name: PORT
+          value: "8002"
+        - name: MONGO_URI
+          value: "mongodb://mongo-service:27017/airbnb"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: property-service
+spec:
+  selector:
+    app: property
+  ports:
+    - protocol: TCP
+      port: 8002
+      targetPort: 8002
