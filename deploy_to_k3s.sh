@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Force a consistent project name so we know what the images are called
+export COMPOSE_PROJECT_NAME=airbnb-lab2
+
 echo "🚀 Deploying to K3s (Local Import Method)..."
 
 # 1. Build Docker Images
@@ -9,16 +12,12 @@ docker compose build
 
 # 2. Tag Images for K8s
 echo "🏷️  Tagging images..."
-# Note: Docker Compose usually names images as <project_name>-<service_name>
-# We assume the project name is the directory name "airbnb-prototype-lab2" (normalized)
-# But to be safe, we'll explicitly tag them.
-
-docker tag airbnb-prototype-lab2-frontend:latest docker.io/rajeswari1929/frontend-service:lab2
-docker tag airbnb-prototype-lab2-traveler:latest docker.io/rajeswari1929/traveler-service:lab2
-docker tag airbnb-prototype-lab2-owner:latest docker.io/rajeswari1929/owner-service:lab2
-docker tag airbnb-prototype-lab2-property:latest docker.io/rajeswari1929/property-service:lab2
-docker tag airbnb-prototype-lab2-booking:latest docker.io/rajeswari1929/booking-service:lab2
-docker tag airbnb-prototype-lab2-agent:latest docker.io/rajeswari1929/agent-service:lab2
+docker tag airbnb-lab2-frontend:latest docker.io/rajeswari1929/frontend-service:lab2
+docker tag airbnb-lab2-traveler:latest docker.io/rajeswari1929/traveler-service:lab2
+docker tag airbnb-lab2-owner:latest docker.io/rajeswari1929/owner-service:lab2
+docker tag airbnb-lab2-property:latest docker.io/rajeswari1929/property-service:lab2
+docker tag airbnb-lab2-booking:latest docker.io/rajeswari1929/booking-service:lab2
+docker tag airbnb-lab2-agent:latest docker.io/rajeswari1929/agent-service:lab2
 
 # 3. Import into K3s
 # K3s uses containerd, so we need to export from Docker and import to K3s
