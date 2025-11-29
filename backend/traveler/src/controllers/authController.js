@@ -18,7 +18,7 @@ export async function signup(req, res, next) {
     );
 
     const user = { id: result.insertId, name, email, role };
-    req.session.user = user;
+    // req.session.user = user; // Disable auto-login per user request
     res.status(201).json({ user });
   } catch (err) { next(err); }
 }
@@ -30,7 +30,7 @@ export async function login(req, res, next) {
     const { email, password } = value;
 
     const [rows] = await pool.query('SELECT id,name,email,password_hash,role FROM users WHERE email=?', [email]);
-    if (!rows.length) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!rows.length) return res.status(401).json({ error: 'User not found' });
 
     const u = rows[0];
     const ok = await bcrypt.compare(password, u.password_hash);
