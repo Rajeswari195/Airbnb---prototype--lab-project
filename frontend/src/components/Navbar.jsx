@@ -106,7 +106,9 @@ export default function Navbar() {
       await ownerApi.enableHost();
       await confirmOwnerReady();
       navigate("/owner");
-    } catch {
+    } catch (e) {
+      alert(`Debug Error: ${e.message}`);
+      console.error(e);
       localStorage.setItem(HOST_INTENT_KEY, "1");
       navigate("/login");
     }
