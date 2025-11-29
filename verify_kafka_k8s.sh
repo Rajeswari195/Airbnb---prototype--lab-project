@@ -30,7 +30,8 @@ fi
 echo "---------------------------------------------------"
 echo "3. Listing Kafka Topics..."
 # We execute the kafka-topics command INSIDE the kafka pod
-KAFKA_POD=$(kubectl get pod -l app=kafka -o jsonpath="{.items[0].metadata.name}")
+# Get the first running kafka pod
+KAFKA_POD=$(kubectl get pod -l app=kafka -o name | cut -d/ -f2 | head -n 1)
 if [ -z "$KAFKA_POD" ]; then
     echo "❌ Kafka pod not found!"
     exit 1
