@@ -2,19 +2,22 @@ import requests
 import csv
 import random
 import time
+import argparse
+import sys
 
-BASE_URL = "http://localhost:8000/api/auth"
+def get_base_urls(host):
+    return f"http://{host}:8000/api/auth", f"http://{host}:8001/api"
 
-def register_user(name, email, password, role='traveler'):
+def register_user(base_url, name, email, password, role='traveler'):
     try:
         # Try login first
-        resp = requests.post(f"{BASE_URL}/login", json={"email": email, "password": password})
+        resp = requests.post(f"{base_url}/login", json={"email": email, "password": password})
         if resp.status_code == 200:
             print(f"User {email} already exists.")
             return True
         
         # If not, signup
-        resp = requests.post(f"{BASE_URL}/signup", json={"name": name, "email": email, "password": password})
+        resp = requests.post(f"{base_url}/signup", json={"name": name, "email": email, "password": password})
         if resp.status_code == 201:
             print(f"Registered {email}")
             return True
@@ -25,9 +28,11 @@ def register_user(name, email, password, role='traveler'):
         print(f"Error registering {email}: {e}")
         return False
 
-def generate_data():
+def generate_data(host):
+    TRAVELER_AUTH_URL, OWNER_API_URL = get_base_urls(host)
+    
     # Generate 500 Travelers
-    print("Generating Travelers...")
+    print(f"Generating Travelers on {host}...")
     with open('travelers.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         # No header for JMeter CSV by default if we ignore first line = false
@@ -36,10 +41,10 @@ def generate_data():
             password = "password123"
             name = f"Traveler {i}"
             writer.writerow([email, password])
-            register_user(name, email, password)
+            register_user(TRAVELER_AUTH_URL, name, email, password)
 
     # Generate 50 Owners
-    print("Generating Owners...")
+    print(f"Generating Owners on {host}...")
     with open('owners.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         for i in range(1, 51):
@@ -48,29 +53,22 @@ def generate_data():
             name = f"Owner {i}"
             writer.writerow([email, password])
             # Register as traveler first
-            if register_user(name, email, password):
+            if register_user(TRAVELER_AUTH_URL, name, email, password):
                 # Enable host mode
                 # Login to get cookie
                 s = requests.Session()
-                s.post(f"{BASE_URL}/login", json={"email": email, "password": password})
+                s.post(f"{TRAVELER_AUTH_URL}/login", json={"email": email, "password": password})
                 # Get token
-                t_resp = s.post(f"{BASE_URL}/session-token")
+                t_resp = s.post(f"{TRAVELER_AUTH_URL}/session-token")
                 if t_resp.status_code == 200:
                     token = t_resp.json()['token']
                     # Exchange
-                    # Owner API is on 8001
-                    o_resp = requests.post("http://localhost:8001/api/auth/exchange", json={"token": token})
+                    o_resp = requests.post(f"{OWNER_API_URL}/auth/exchange", json={"token": token})
                     if o_resp.status_code == 200:
-                        # Enable Host
-                        # Need to set cookie for owner session? 
-                        # The exchange sets the cookie in the response.
-                        # requests.Session handles cookies automatically if we use the same session object? 
-                        # No, different domain/port usually means different cookies, but localhost is same domain.
-                        # However, we need to capture the cookie from 8001 response.
                         owner_cookies = o_resp.cookies
                         
                         # Enable host
-                        h_resp = requests.post("http://localhost:8001/api/auth/host/enable", cookies=owner_cookies)
+                        h_resp = requests.post(f"{OWNER_API_URL}/host/enable", cookies=owner_cookies)
                         if h_resp.status_code == 200:
                             print(f"Enabled host for {email}")
                             
@@ -80,15 +78,13 @@ def generate_data():
                                 "description": "A lovely place for testing",
                                 "price": random.randint(50, 500),
                                 "city": "Test City",
-                                # "country": "Test Country", # Not allowed by schema
                                 "type": "Apartment",
                                 "capacity": 4,
                                 "bedrooms": 2,
                                 "bathrooms": 1,
                                 "amenities": ["Wifi", "Kitchen"]
                             }
-                            # Property API is on 8001 (Owner Service)
-                            p_resp = requests.post("http://localhost:8001/api/properties", json=prop_data, cookies=owner_cookies)
+                            p_resp = requests.post(f"{OWNER_API_URL}/properties", json=prop_data, cookies=owner_cookies)
                             if p_resp.status_code == 201:
                                 print(f"Created property for {email}")
                             else:
@@ -98,4 +94,8 @@ def generate_data():
                             print(f"Failed to enable host for {email}: {h_resp.text}")
 
 if __name__ == "__main__":
-    generate_data()
+    parser = argparse.ArgumentParser(description='Generate test data for Airbnb Prototype')
+    parser.add_argument('--host', default='localhost', help='Target host IP (default: localhost)')
+    args = parser.parse_args()
+    
+    generate_data(args.host)
