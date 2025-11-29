@@ -22,7 +22,26 @@ export async function connectMongoProperty() {
 export function createApp() {
   const app = express();
 
-  app.use(cors());
+  // ---- CORS ----
+  const allowed = [
+    process.env.CORS_ORIGIN || 'http://localhost:5173',
+    'http://localhost:3000',
+    `http://localhost:${process.env.PORT || 8002}`,
+    'http://18.212.21.198:3000',
+  ];
+
+  app.use(
+    cors({
+      origin: (origin, cb) => {
+        if (!origin) return cb(null, true);
+        if (allowed.indexOf(origin) !== -1 || origin.startsWith('http://localhost')) {
+          return cb(null, true);
+        }
+        return cb(new Error('Not allowed by CORS'));
+      },
+      credentials: true,
+    })
+  );
   app.use(express.json());
 
   // Simple health endpoint
