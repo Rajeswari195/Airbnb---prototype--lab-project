@@ -63,7 +63,17 @@ kubectl set image deployment/traveler-deployment traveler=docker.io/rajeswari192
 kubectl set image deployment/owner-deployment owner=docker.io/rajeswari1929/owner-service:$TAG
 kubectl set image deployment/property-deployment property=docker.io/rajeswari1929/property-service:$TAG
 kubectl set image deployment/booking-deployment booking=docker.io/rajeswari1929/booking-service:$TAG
+kubectl set image deployment/booking-deployment booking=docker.io/rajeswari1929/booking-service:$TAG
 kubectl set image deployment/agent-deployment agent=docker.io/rajeswari1929/agent-service:$TAG
+
+# 5b. Update Environment Variables (CORS)
+echo "🌍 Updating CORS configuration with Public IP: $PUBLIC_IP..."
+CORS_URLS="http://localhost:3000,http://$PUBLIC_IP:3000"
+
+kubectl set env deployment/traveler-deployment CORS_ORIGINS=$CORS_URLS
+kubectl set env deployment/owner-deployment CORS_ORIGINS=$CORS_URLS
+kubectl set env deployment/property-deployment CORS_ORIGINS=$CORS_URLS
+kubectl set env deployment/agent-deployment CORS_ORIGINS=$CORS_URLS
 
 # 6. Reset Database (As requested, ensure no stale data)
 ./reset_db.sh
