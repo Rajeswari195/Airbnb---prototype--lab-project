@@ -36,6 +36,16 @@ import_image "docker.io/rajeswari1929/property-service:lab2"
 import_image "docker.io/rajeswari1929/booking-service:lab2"
 import_image "docker.io/rajeswari1929/agent-service:lab2"
 
+# 3b. VERIFY Images exist
+echo "🔍 Verifying images in K3s..."
+if sudo k3s ctr -n k8s.io images list | grep -q "rajeswari1929"; then
+    echo "✅ Images found in K3s registry!"
+    sudo k3s ctr -n k8s.io images list | grep "rajeswari1929"
+else
+    echo "❌ CRITICAL ERROR: Images NOT found in K3s registry after import."
+    exit 1
+fi
+
 # 4. Restart Deployments
 echo "🔄 Restarting K8s deployments..."
 kubectl rollout restart deployment frontend-deployment
