@@ -51,7 +51,11 @@ else
     exit 1
 fi
 
-# 4. Restart Deployments
+# 4. Apply Manifests (Ensure latest config is used)
+echo "📄 Applying Kubernetes Manifests..."
+kubectl apply -f infra/k8s/
+
+# 5. Restart Deployments
 echo "🔄 Restarting K8s deployments..."
 kubectl rollout restart deployment frontend-deployment
 kubectl rollout restart deployment traveler-deployment
