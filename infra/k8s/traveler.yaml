@@ -15,7 +15,7 @@ spec:
       containers:
       - name: traveler
         image: docker.io/rajeswari1929/traveler-service:lab2
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
         env:

@@ -15,7 +15,7 @@ spec:
       containers:
       - name: frontend
         image: docker.io/rajeswari1929/frontend-service:lab2
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
 ---
