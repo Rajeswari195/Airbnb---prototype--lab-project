@@ -27,7 +27,7 @@ export function createApp() {
     process.env.CORS_ORIGIN || 'http://localhost:5173',
     'http://localhost:3000',
     `http://localhost:${process.env.PORT || 8002}`,
-    'http://18.212.21.198:3000',
+    process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : 'http://localhost:3000',
   ];
 
   app.use(

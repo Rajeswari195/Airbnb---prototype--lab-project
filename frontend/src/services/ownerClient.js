@@ -1,4 +1,4 @@
-const OWNER_API = "http://18.212.21.198:8001";
+const OWNER_API = process.env.REACT_APP_OWNER_API || "http://localhost:8001";
 
 async function request(path, opts = {}) {
   const res = await fetch(`${OWNER_API}${path}`, {

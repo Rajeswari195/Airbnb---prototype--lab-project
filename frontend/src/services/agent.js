@@ -1,4 +1,4 @@
-const BASE = "http://18.212.21.198:8500";
+const BASE = process.env.REACT_APP_AGENT_BASE || "http://localhost:8500";
 
 export async function planTrip(payload) {
   const res = await fetch(`${BASE}/plan`, {
