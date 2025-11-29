@@ -1,4 +1,5 @@
-import { pool } from '../db/pool.js';
+import Booking from '../models/Booking.js';
+import Property from '../models/Property.js';
 import { sendBookingRequest } from '../kafka/producer.js';
 
 export async function createBooking(req, res, next) {
@@ -9,19 +10,28 @@ export async function createBooking(req, res, next) {
       return res.status(400).json({ error: 'propertyId,start,end,guests required' });
     }
 
-    const [[prop]] = await pool.query(`SELECT id, guests_max FROM properties WHERE id=?`, [propertyId]);
+    // Use Mongoose to find property
+    const prop = await Property.findById(propertyId);
     if (!prop) return res.status(404).json({ error: 'Property not found' });
-    if (guests > prop.guests_max) return res.status(400).json({ error: 'Guests exceed capacity' });
 
-    const [result] = await pool.query(
-      `INSERT INTO bookings (traveler_id, property_id, start_date, end_date, guests, status)
-       VALUES (?,?,?,?,?, 'PENDING')`,
-      [travelerId, propertyId, start, end, guests]
-    );
+    // Check capacity (assuming prop.capacity or prop.guests_max exists)
+    const capacity = prop.capacity || prop.guests_max || 100;
+    if (guests > capacity) return res.status(400).json({ error: 'Guests exceed capacity' });
+
+    // Create Booking in MongoDB
+    const booking = new Booking({
+      propertyId,
+      userId: travelerId,
+      startDate: start,
+      endDate: end,
+      guests,
+      status: 'PENDING'
+    });
+    await booking.save();
 
     // Publish to Kafka
     const bookingData = {
-      _id: result.insertId,
+      _id: booking._id,
       propertyId,
       userId: travelerId,
       startDate: start,
@@ -33,7 +43,7 @@ export async function createBooking(req, res, next) {
     // Fire and forget (or await if critical)
     sendBookingRequest(bookingData).catch(err => console.error("Kafka Publish Error:", err));
 
-    res.status(201).json({ id: result.insertId, status: 'PENDING' });
+    res.status(201).json({ id: booking._id, status: 'PENDING' });
   } catch (err) { next(err); }
 }
 
@@ -41,19 +51,14 @@ export async function listTravelerBookings(req, res, next) {
   try {
     const travelerId = req.session.user.id;
     const status = req.query.status;
-    const params = [travelerId];
-    let where = 'WHERE b.traveler_id = ?';
-    if (status) { where += ' AND b.status = ?'; params.push(status); }
 
-    const [rows] = await pool.query(
-      `
-      SELECT b.*, p.title, p.city, p.country, p.price_per_night
-      FROM bookings b
-      JOIN properties p ON p.id=b.property_id
-      ${where}
-      ORDER BY b.created_at DESC
-      `, params
-    );
-    res.json(rows);
+    const query = { userId: travelerId };
+    if (status) query.status = status;
+
+    const bookings = await Booking.find(query)
+      .populate('propertyId', 'title city country price') // Populate property details
+      .sort({ createdAt: -1 });
+
+    res.json(bookings);
   } catch (err) { next(err); }
 }
