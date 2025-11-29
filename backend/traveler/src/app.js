@@ -11,6 +11,7 @@ import swaggerUi from 'swagger-ui-express';
 
 // Use shared Mongo URI config + connector
 import { mongoUri, connectMongoTraveler } from './config/mongo.js';
+import { connectProducer } from './kafka/producer.js';
 
 // ---- Routes ----
 import healthRoutes from './routes/health.js';
@@ -25,8 +26,9 @@ const app = express();
 
 // ---- CONNECT TO MONGO FIRST ----
 connectMongoTraveler()
-  .then(() => {
+  .then(async () => {
     console.log('🟢 Traveler Mongo connected BEFORE app middleware');
+    await connectProducer();
   })
   .catch((err) => {
     console.error('🔴 Traveler Mongo failed to connect:', err);

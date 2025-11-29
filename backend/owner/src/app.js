@@ -10,6 +10,7 @@ import fs from 'fs';
 import swaggerUi from 'swagger-ui-express';
 
 import { connectMongoOwner, mongoUri } from './config/mongo.js';
+import { connectConsumer } from './kafka/consumer.js';
 
 // ---- Routes ----
 import healthRoutes from './routes/health.js';
@@ -23,6 +24,8 @@ import hostRoutes from './routes/host.js';
 
 // ensure Mongo is connected before we start handling requests
 await connectMongoOwner();
+// Connect Kafka Consumer
+await connectConsumer().catch(err => console.error("Kafka Consumer Error:", err));
 
 const app = express();
 

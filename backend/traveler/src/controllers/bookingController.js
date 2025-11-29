@@ -1,4 +1,5 @@
 import { pool } from '../db/pool.js';
+import { sendBookingRequest } from '../kafka/producer.js';
 
 export async function createBooking(req, res, next) {
   try {
@@ -17,6 +18,21 @@ export async function createBooking(req, res, next) {
        VALUES (?,?,?,?,?, 'PENDING')`,
       [travelerId, propertyId, start, end, guests]
     );
+
+    // Publish to Kafka
+    const bookingData = {
+      _id: result.insertId,
+      propertyId,
+      userId: travelerId,
+      startDate: start,
+      endDate: end,
+      guests,
+      status: 'PENDING'
+    };
+
+    // Fire and forget (or await if critical)
+    sendBookingRequest(bookingData).catch(err => console.error("Kafka Publish Error:", err));
+
     res.status(201).json({ id: result.insertId, status: 'PENDING' });
   } catch (err) { next(err); }
 }
