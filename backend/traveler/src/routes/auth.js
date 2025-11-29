@@ -70,7 +70,7 @@ router.post('/signup', async (req, res, next) => {
       role: user.role
     });
 
-    setTravelerSession(req, user);
+    // setTravelerSession(req, user); // Disable auto-login per user request
 
     res.status(201).json({
       id: String(user._id),
@@ -97,7 +97,7 @@ router.post('/login', async (req, res, next) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'User not found' });
     }
 
     // Use the method on the user instance
