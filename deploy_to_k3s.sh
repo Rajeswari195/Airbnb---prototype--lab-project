@@ -56,9 +56,8 @@ kubectl set image deployment/property-deployment property=docker.io/rajeswari192
 kubectl set image deployment/booking-deployment booking=docker.io/rajeswari1929/booking-service:$TAG
 kubectl set image deployment/agent-deployment agent=docker.io/rajeswari1929/agent-service:$TAG
 
-# 6. Restart Mongo (To clear stale data)
-echo "🧹 Restarting Mongo to clear stale data..."
-kubectl rollout restart deployment mongo-deployment
+# 6. Reset Database (As requested, ensure no stale data)
+./reset_db.sh
 
-echo "✅ Deployment Updated!"
+echo "✅ Deployment Updated & DB Reset!"
 echo "Check status with: kubectl get pods"
