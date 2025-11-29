@@ -9,8 +9,8 @@ export DOCKER_DEFAULT_PLATFORM=linux/amd64
 echo "🚀 Deploying to K3s (Local Import Method)..."
 
 # 1. Build Docker Images
-echo "🔨 Building Docker images (AMD64)..."
-docker compose build
+echo "🔨 Building Docker images (AMD64) - FORCING NO CACHE..."
+docker compose build --no-cache
 
 # 2. Tag Images for K8s
 echo "🏷️  Tagging images..."
