@@ -1,6 +1,6 @@
 // frontend/src/services/api.js
 const TRAVELER_API = "http://18.212.21.198:8000";
-const OWNER_API = "http://18.212.21.198:8000";
+const OWNER_API = "http://18.212.21.198:8001";
 
 async function request(base, path, opts = {}) {
   // allow404 is used for endpoints where "not found" is not a fatal error
