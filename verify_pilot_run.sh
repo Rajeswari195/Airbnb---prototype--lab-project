@@ -89,7 +89,7 @@ PROP_RESP=$(curl -b owner_api_cookies.txt -s -X POST "$OWNER_API/properties" \
     "bathrooms": 1,
     "amenities": ["Wifi"]
   }')
-PROP_ID=$(echo $PROP_RESP | grep -o '"id":[^,}]*' | cut -d':' -f2 | tr -d ' ')
+PROP_ID=$(echo $PROP_RESP | grep -o '"id":[^,}]*' | cut -d':' -f2 | tr -d ' ' | tr -d '"')
 echo "✅ Property Created: ID $PROP_ID"
 
 # 3. Create Booking (Triggers Kafka Event)
