@@ -27,6 +27,7 @@ export async function sendBookingRequest(booking) {
                         bookingId: booking._id,
                         propertyId: booking.propertyId,
                         userId: booking.userId,
+                        startDate: booking.startDate,
                         endDate: booking.endDate,
                         guests: booking.guests,
                         traceId: booking.traceId || 'no-trace-id'
