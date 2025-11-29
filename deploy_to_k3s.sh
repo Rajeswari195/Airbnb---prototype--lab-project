@@ -6,6 +6,10 @@ export COMPOSE_PROJECT_NAME=airbnb-lab2
 # Force AMD64 build since host is x86_64
 export DOCKER_DEFAULT_PLATFORM=linux/amd64
 
+# Detect Public IP automatically
+export PUBLIC_IP=$(curl -s http://checkip.amazonaws.com)
+echo "🌍 Detected Public IP: $PUBLIC_IP"
+
 # Generate a unique tag for this deployment
 TAG="v$(date +%s)"
 echo "🏷️  Deployment Tag: $TAG"
