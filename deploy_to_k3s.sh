@@ -10,6 +10,11 @@ export DOCKER_DEFAULT_PLATFORM=linux/amd64
 export PUBLIC_IP=$(curl -s http://checkip.amazonaws.com)
 echo "🌍 Detected Public IP: $PUBLIC_IP"
 
+# Fix K3s permissions so we can run kubectl commands
+echo "🔧 Fixing K3s kubeconfig permissions..."
+sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
 # Generate a unique tag for this deployment
 TAG="v$(date +%s)"
 echo "🏷️  Deployment Tag: $TAG"
