@@ -27,6 +27,9 @@ echo "📦 Importing images into K3s (this may take a moment)..."
 
 function import_image() {
     IMAGE=$1
+    echo "   -> Cleaning old image $IMAGE..."
+    sudo k3s ctr -n k8s.io images remove "$IMAGE" > /dev/null 2>&1 || true
+    
     echo "   -> Importing $IMAGE..."
     docker save "$IMAGE" | sudo k3s ctr -n k8s.io images import - > /dev/null
 }
