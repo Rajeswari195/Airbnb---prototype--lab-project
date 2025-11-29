@@ -33,6 +33,7 @@ kind: Service
 metadata:
   name: owner-service
 spec:
+  type: LoadBalancer
   selector:
     app: owner
   ports:

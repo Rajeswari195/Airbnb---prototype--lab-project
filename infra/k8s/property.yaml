@@ -29,6 +29,7 @@ kind: Service
 metadata:
   name: property-service
 spec:
+  type: LoadBalancer
   selector:
     app: property
   ports:

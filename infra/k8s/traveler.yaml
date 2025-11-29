@@ -33,6 +33,7 @@ kind: Service
 metadata:
   name: traveler-service
 spec:
+  type: LoadBalancer
   selector:
     app: traveler
   ports:
