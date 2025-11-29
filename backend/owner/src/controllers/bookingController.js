@@ -1,18 +1,35 @@
-import { pool } from '../db/pool.js';
+import Booking from '../models/Booking.js';
+import Property from '../models/Property.js';
+import { sendStatusUpdate } from '../kafka/statusProducer.js';
 
 export async function listIncoming(req, res, next) {
   try {
     const ownerId = req.session.user.id;
     const status = req.query.status || 'PENDING';
-    const [rows] = await pool.query(
-      `SELECT b.*, p.title, p.city, p.country, u.name AS traveler_name, u.email AS traveler_email
-       FROM bookings b
-       JOIN properties p ON p.id=b.property_id
-       JOIN users u ON u.id=b.traveler_id
-       WHERE p.owner_id=? AND b.status=?
-       ORDER BY b.created_at DESC`,
-      [ownerId, status]
-    );
+
+    // Find properties owned by this user
+    const properties = await Property.find({ ownerId });
+    const propertyIds = properties.map(p => p._id);
+
+    // Find bookings for these properties
+    const bookings = await Booking.find({
+      propertyId: { $in: propertyIds },
+      status: status
+    })
+      .populate('propertyId', 'title city country')
+      .populate('userId', 'name email') // Populate traveler details
+      .sort({ createdAt: -1 });
+
+    // Map to match expected frontend format
+    const rows = bookings.map(b => ({
+      ...b.toObject(),
+      title: b.propertyId?.title,
+      city: b.propertyId?.city,
+      country: b.propertyId?.country,
+      traveler_name: b.userId?.name,
+      traveler_email: b.userId?.email
+    }));
+
     res.json(rows);
   } catch (e) { next(e); }
 }
@@ -20,44 +37,71 @@ export async function listIncoming(req, res, next) {
 export async function acceptBooking(req, res, next) {
   try {
     const ownerId = req.session.user.id;
-    const id = Number(req.params.id);
+    const id = req.params.id; // Mongoose ID is string
 
-    const [rows] = await pool.query(
-      `SELECT b.*, p.owner_id FROM bookings b JOIN properties p ON p.id=b.property_id WHERE b.id=?`,
-      [id]
-    );
-    const b = rows[0];
-    if (!b || b.owner_id !== ownerId) return res.status(404).json({ error: 'Not found' });
-    if (b.status !== 'PENDING') return res.status(400).json({ error: 'Only PENDING can be accepted' });
+    const booking = await Booking.findById(id).populate('propertyId');
+    if (!booking) return res.status(404).json({ error: 'Not found' });
 
-    // check overlap against already ACCEPTED bookings
-    const [conflicts] = await pool.query(
-      `SELECT id FROM bookings
-       WHERE property_id=? AND status='ACCEPTED'
-         AND NOT (end_date <= ? OR start_date >= ?)`,
-      [b.property_id, b.start_date, b.end_date]
-    );
+    // Verify ownership
+    if (String(booking.propertyId.ownerId) !== String(ownerId)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    if (booking.status !== 'PENDING') return res.status(400).json({ error: 'Only PENDING can be accepted' });
+
+    // Check overlap
+    const conflicts = await Booking.find({
+      propertyId: booking.propertyId._id,
+      status: 'ACCEPTED',
+      _id: { $ne: booking._id },
+      $or: [
+        { startDate: { $lt: booking.endDate }, endDate: { $gt: booking.startDate } }
+      ]
+    });
+
     if (conflicts.length) return res.status(409).json({ error: 'Dates already booked' });
 
-    await pool.query(`UPDATE bookings SET status='ACCEPTED' WHERE id=?`, [id]);
-    res.json({ id, status: 'ACCEPTED' });
+    booking.status = 'ACCEPTED';
+    await booking.save();
+
+    // Publish status update
+    sendStatusUpdate({
+      bookingId: booking._id,
+      status: 'ACCEPTED',
+      travelerId: booking.userId,
+      propertyId: booking.propertyId._id
+    }).catch(err => console.error("Kafka Status Publish Error:", err));
+
+    res.json({ id: booking._id, status: 'ACCEPTED' });
   } catch (e) { next(e); }
 }
 
 export async function cancelBooking(req, res, next) {
   try {
     const ownerId = req.session.user.id;
-    const id = Number(req.params.id);
+    const id = req.params.id;
 
-    const [rows] = await pool.query(
-      `SELECT b.*, p.owner_id FROM bookings b JOIN properties p ON p.id=b.property_id WHERE b.id=?`,
-      [id]
-    );
-    const b = rows[0];
-    if (!b || b.owner_id !== ownerId) return res.status(404).json({ error: 'Not found' });
-    if (b.status === 'CANCELLED') return res.json({ id, status: 'CANCELLED' });
+    const booking = await Booking.findById(id).populate('propertyId');
+    if (!booking) return res.status(404).json({ error: 'Not found' });
 
-    await pool.query(`UPDATE bookings SET status='CANCELLED' WHERE id=?`, [id]);
-    res.json({ id, status: 'CANCELLED' });
+    // Verify ownership
+    if (String(booking.propertyId.ownerId) !== String(ownerId)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    if (booking.status === 'CANCELLED') return res.json({ id: booking._id, status: 'CANCELLED' });
+
+    booking.status = 'CANCELLED';
+    await booking.save();
+
+    // Publish status update
+    sendStatusUpdate({
+      bookingId: booking._id,
+      status: 'CANCELLED',
+      travelerId: booking.userId,
+      propertyId: booking.propertyId._id
+    }).catch(err => console.error("Kafka Status Publish Error:", err));
+
+    res.json({ id: booking._id, status: 'CANCELLED' });
   } catch (e) { next(e); }
 }

@@ -80,6 +80,11 @@ BOOK_RESP=$(curl -b traveler_cookies.txt -s -X POST "$TRAVELER_API/bookings" \
   -H "Content-Type: application/json" \
   -d "{\"propertyId\":$PROP_ID,\"start\":\"2025-12-01\",\"end\":\"2025-12-05\",\"guests\":1}")
 BOOK_ID=$(echo $BOOK_RESP | grep -o '"id":[^,}]*' | cut -d':' -f2 | tr -d ' ')
+if [ -z "$BOOK_ID" ]; then
+    echo "❌ Booking Creation Failed!"
+    echo "Response: $BOOK_RESP"
+    exit 1
+fi
 echo "✅ Booking Created: ID $BOOK_ID"
 echo "👉 CHECK KAFKA LOGS NOW! (You should see a booking-events message)"
 
