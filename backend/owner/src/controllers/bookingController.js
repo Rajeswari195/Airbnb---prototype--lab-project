@@ -65,7 +65,7 @@ export async function acceptBooking(req, res, next) {
     await booking.save();
 
     // Publish status update
-    sendStatusUpdate({
+    await sendStatusUpdate({
       bookingId: booking._id,
       status: 'ACCEPTED',
       travelerId: booking.userId,
@@ -95,7 +95,7 @@ export async function cancelBooking(req, res, next) {
     await booking.save();
 
     // Publish status update
-    sendStatusUpdate({
+    await sendStatusUpdate({
       bookingId: booking._id,
       status: 'CANCELLED',
       travelerId: booking.userId,
