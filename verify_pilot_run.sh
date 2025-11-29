@@ -44,17 +44,35 @@ curl -c owner_cookies.txt -s -X POST "$TRAVELER_API/auth/login" \
   -d "{\"email\":\"$OWNER_EMAIL\",\"password\":\"password123\"}" > /dev/null
 
 # Get Session Token
-TOKEN=$(curl -b owner_cookies.txt -s -X POST "$TRAVELER_API/auth/session-token" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+TOKEN_RESP=$(curl -b owner_cookies.txt -s -X POST "$TRAVELER_API/auth/session-token")
+TOKEN=$(echo $TOKEN_RESP | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+
+if [ -z "$TOKEN" ]; then
+    echo "❌ Failed to get session token!"
+    echo "Response: $TOKEN_RESP"
+    exit 1
+fi
 
 # Exchange Token
 echo "🔄 Exchanging Token for Owner Session..."
-curl -c owner_api_cookies.txt -s -X POST "$OWNER_API/auth/exchange" \
+EXCHANGE_RESP=$(curl -c owner_api_cookies.txt -s -X POST "$OWNER_API/auth/exchange" \
   -H "Content-Type: application/json" \
-  -d "{\"token\":\"$TOKEN\"}" > /dev/null
+  -d "{\"token\":\"$TOKEN\"}")
+
+if echo "$EXCHANGE_RESP" | grep -q "error"; then
+    echo "❌ Token Exchange Failed!"
+    echo "Response: $EXCHANGE_RESP"
+    exit 1
+fi
 
 # Enable Host
 echo "🏠 Enabling Host Mode..."
-curl -b owner_api_cookies.txt -s -X POST "$OWNER_API/host/enable" > /dev/null
+HOST_RESP=$(curl -b owner_api_cookies.txt -s -X POST "$OWNER_API/host/enable")
+if echo "$HOST_RESP" | grep -q "error"; then
+    echo "❌ Failed to enable host mode!"
+    echo "Response: $HOST_RESP"
+    exit 1
+fi
 
 # Create Property
 echo "Build Property..."
