@@ -6,8 +6,9 @@ export async function startStatusConsumer() {
   });
 
   await consumer.connect();
+  const topic = process.env.BOOKING_TOPIC || 'booking-events';
   await consumer.subscribe({
-    topic: process.env.BOOKING_TOPIC || 'booking-events',
+    topic,
     fromBeginning: false,
   });
 
