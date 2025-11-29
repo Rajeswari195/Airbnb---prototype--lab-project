@@ -5,14 +5,7 @@ export const createBooking = createAsyncThunk(
     'bookings/createBooking',
     async (bookingData, { rejectWithValue }) => {
         try {
-            const response = await fetch('http://localhost:8003/api/bookings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(bookingData),
-                credentials: 'include',
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Booking failed');
+            const data = await travelerApi.createBooking(bookingData);
             return data;
         } catch (err) {
             return rejectWithValue(err.message);

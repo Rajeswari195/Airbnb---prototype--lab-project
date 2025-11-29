@@ -1,13 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
+import { travelerApi } from '../../services/api';
+
 export const fetchProperties = createAsyncThunk(
     'properties/fetchProperties',
     async (filters, { rejectWithValue }) => {
         try {
-            const query = new URLSearchParams(filters).toString();
-            const response = await fetch(`http://localhost:8000/api/properties?${query}`);
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Failed to fetch properties');
+            const data = await travelerApi.listings(filters);
             return data;
         } catch (err) {
             return rejectWithValue(err.message);
