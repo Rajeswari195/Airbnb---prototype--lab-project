@@ -11,15 +11,49 @@ fi
 
 HOST=$1
 
-# Check for JMeter
-if ! command -v jmeter &> /dev/null; then
-    echo "⚠️ JMeter not found. Attempting to install via Homebrew..."
-    if command -v brew &> /dev/null; then
-        brew install jmeter
+# Function to install Java
+install_java() {
+    echo "☕ Java not found. Installing..."
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update && sudo apt-get install -y default-jre
+    elif command -v yum &> /dev/null; then
+        sudo yum install -y java-17-amazon-corretto-headless || sudo yum install -y java-1.8.0-openjdk
+    elif command -v dnf &> /dev/null; then
+        sudo dnf install -y java-17-amazon-corretto-headless
     else
-        echo "❌ Homebrew not found. Please install JMeter manually (https://jmeter.apache.org/download_jmeter.cgi)."
+        echo "❌ Could not install Java. Please install Java manually."
         exit 1
     fi
+}
+
+# Check Java
+if ! command -v java &> /dev/null; then
+    install_java
+fi
+
+# Check JMeter
+if ! command -v jmeter &> /dev/null; then
+    echo "⚠️ JMeter not found in PATH."
+    
+    # Check if we already downloaded it locally
+    if [ -d "apache-jmeter-5.6.3" ]; then
+        echo "✅ Found local JMeter directory."
+        JMETER_BIN="$(pwd)/apache-jmeter-5.6.3/bin/jmeter"
+    else
+        echo "⬇️ Downloading Apache JMeter 5.6.3..."
+        # Check for wget or curl
+        if command -v wget &> /dev/null; then
+            wget -q https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.6.3.tgz
+        else
+            curl -O https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.6.3.tgz
+        fi
+        
+        echo "📦 Extracting..."
+        tar -xzf apache-jmeter-5.6.3.tgz
+        JMETER_BIN="$(pwd)/apache-jmeter-5.6.3/bin/jmeter"
+    fi
+else
+    JMETER_BIN="jmeter"
 fi
 
 echo "🚀 Starting AWS Performance Test against $HOST..."
@@ -57,7 +91,7 @@ run_test() {
     REPORT_DIR="results/report_${USERS}_users"
     rm -rf $REPORT_DIR
     
-    jmeter -n \
+    $JMETER_BIN -n \
         -t aws_performance_test.jmx \
         -l results/results_${USERS}.csv \
         -e -o $REPORT_DIR \
