@@ -1,4 +1,4 @@
-const OWNER_API = process.env.REACT_APP_OWNER_API;
+const OWNER_API = "http://18.212.21.198:8001";
 
 async function request(path, opts = {}) {
   const res = await fetch(`${OWNER_API}${path}`, {
@@ -28,7 +28,7 @@ export const ownerClient = {
   dashboard: () => request("/api/dashboard"),
 
   listProps: () => request("/api/properties"),
-  getProp:   (id) => request(`/api/properties/${id}`),
+  getProp: (id) => request(`/api/properties/${id}`),
   createProp: (payload) =>
     request("/api/properties", {
       method: "POST",
@@ -54,6 +54,6 @@ export const ownerClient = {
   },
 
   incoming: () => request("/api/bookings/incoming"),
-  accept:   (id) => request(`/api/bookings/${id}/accept`, { method: "POST" }),
-  cancel:   (id) => request(`/api/bookings/${id}/cancel`, { method: "POST" }),
+  accept: (id) => request(`/api/bookings/${id}/accept`, { method: "POST" }),
+  cancel: (id) => request(`/api/bookings/${id}/cancel`, { method: "POST" }),
 };
