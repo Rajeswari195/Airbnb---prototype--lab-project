@@ -13,7 +13,7 @@ const producer = kafka.producer();
 export async function startBookingConsumer() {
     await consumer.connect();
     await producer.connect();
-    await consumer.subscribe({ topic: 'booking.requests', fromBeginning: true });
+    await consumer.subscribe({ topic: process.env.BOOKING_TOPIC || 'booking-events', fromBeginning: true });
 
     await consumer.run({
         eachMessage: async ({ topic, partition, message }) => {
