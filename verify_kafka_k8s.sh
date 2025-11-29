@@ -36,7 +36,14 @@ if [ -z "$KAFKA_POD" ]; then
     exit 1
 fi
 
+echo "Attempting to list topics..."
 kubectl exec $KAFKA_POD -- kafka-topics --bootstrap-server localhost:9092 --list
+
+echo "---------------------------------------------------"
+echo "3b. Ensuring 'booking-events' topic exists..."
+# Try to create it manually to fix LEADER_NOT_AVAILABLE errors
+kubectl exec $KAFKA_POD -- kafka-topics --bootstrap-server localhost:9092 --create --topic booking-events --partitions 1 --replication-factor 1 --if-not-exists
+echo "✅ Topic 'booking-events' ensured."
 
 # 4. Consumer Check Instructions
 echo "---------------------------------------------------"
