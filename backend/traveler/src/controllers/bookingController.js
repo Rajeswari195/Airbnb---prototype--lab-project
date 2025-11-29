@@ -5,9 +5,9 @@ import { sendBookingRequest } from '../kafka/producer.js';
 export async function createBooking(req, res, next) {
   try {
     const travelerId = req.session.user.id;
-    const { propertyId, start, end, guests } = req.body || {};
-    if (!propertyId || !start || !end || !guests) {
-      return res.status(400).json({ error: 'propertyId,start,end,guests required' });
+    const { propertyId, startDate, endDate, guests } = req.body || {};
+    if (!propertyId || !startDate || !endDate || !guests) {
+      return res.status(400).json({ error: 'propertyId,startDate,endDate,guests required' });
     }
 
     // Use Mongoose to find property
@@ -22,8 +22,8 @@ export async function createBooking(req, res, next) {
     const booking = new Booking({
       propertyId,
       userId: travelerId,
-      startDate: start,
-      endDate: end,
+      startDate,
+      endDate,
       guests,
       status: 'PENDING'
     });
@@ -34,8 +34,8 @@ export async function createBooking(req, res, next) {
       _id: booking._id,
       propertyId,
       userId: travelerId,
-      startDate: start,
-      endDate: end,
+      startDate,
+      endDate,
       guests,
       status: 'PENDING'
     };
