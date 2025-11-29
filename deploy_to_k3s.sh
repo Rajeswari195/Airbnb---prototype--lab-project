@@ -26,7 +26,7 @@ echo "📦 Importing images into K3s (this may take a moment)..."
 function import_image() {
     IMAGE=$1
     echo "   -> Importing $IMAGE..."
-    docker save "$IMAGE" | sudo k3s ctr images import - > /dev/null
+    docker save "$IMAGE" | sudo k3s ctr -n k8s.io images import - > /dev/null
 }
 
 import_image "docker.io/rajeswari1929/frontend-service:lab2"
