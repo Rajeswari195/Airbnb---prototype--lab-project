@@ -3,11 +3,13 @@ set -e
 
 # Force a consistent project name so we know what the images are called
 export COMPOSE_PROJECT_NAME=airbnb-lab2
+# Force AMD64 build since host is x86_64
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
 
 echo "🚀 Deploying to K3s (Local Import Method)..."
 
 # 1. Build Docker Images
-echo "🔨 Building Docker images..."
+echo "🔨 Building Docker images (AMD64)..."
 docker compose build
 
 # 2. Tag Images for K8s
