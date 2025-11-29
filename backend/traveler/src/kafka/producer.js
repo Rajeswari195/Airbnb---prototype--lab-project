@@ -19,7 +19,7 @@ export async function connectProducer() {
 export async function sendBookingRequest(booking) {
     try {
         await producer.send({
-            topic: 'booking.requests',
+            topic: process.env.BOOKING_TOPIC || 'booking-events',
             messages: [
                 {
                     key: String(booking._id),
@@ -34,7 +34,7 @@ export async function sendBookingRequest(booking) {
                 }
             ]
         });
-        console.log(`Sent booking.requests for ${booking._id}`);
+        console.log(`Sent event to ${process.env.BOOKING_TOPIC || 'booking-events'} for ${booking._id}`);
     } catch (err) {
         console.error('Failed to send booking request:', err);
     }
