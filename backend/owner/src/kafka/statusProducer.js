@@ -19,9 +19,9 @@ async function getStatusProducer() {
  * Publish BOOKING_STATUS_UPDATED events so Traveler/other services
  * can consume them.
  */
-export async function sendStatusEvent(event) {
+export async function sendStatusUpdate(event) {
   const producer = await getStatusProducer();
-  const topic = process.env.BOOKING_STATUS_TOPIC || 'booking-status-events';
+  const topic = process.env.BOOKING_TOPIC || 'booking-events';
 
   await producer.send({
     topic,

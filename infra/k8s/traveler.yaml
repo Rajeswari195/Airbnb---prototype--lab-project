@@ -27,6 +27,8 @@ spec:
           value: "kafka-service:9092"
         - name: ENABLE_KAFKA
           value: "true"
+        - name: BOOKING_TOPIC
+          value: "booking-events"
 ---
 apiVersion: v1
 kind: Service

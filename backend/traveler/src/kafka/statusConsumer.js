@@ -1,14 +1,15 @@
 import kafka from './client.js';
 
-const topic = process.env.BOOKING_STATUS_TOPIC || 'booking-status-events';
-
 export async function startStatusConsumer() {
   const consumer = kafka.consumer({
     groupId: process.env.KAFKA_STATUS_GROUP_ID || 'traveler-status-group',
   });
 
   await consumer.connect();
-  await consumer.subscribe({ topic, fromBeginning: false });
+  await consumer.subscribe({
+    topic: process.env.BOOKING_TOPIC || 'booking-events',
+    fromBeginning: false,
+  });
 
   console.log(
     `[traveler-service] Kafka status consumer subscribed to topic "${topic}"`

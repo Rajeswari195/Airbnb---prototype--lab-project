@@ -12,6 +12,7 @@ import swaggerUi from 'swagger-ui-express';
 // Use shared Mongo URI config + connector
 import { mongoUri, connectMongoTraveler } from './config/mongo.js';
 import { connectProducer } from './kafka/producer.js';
+import { startStatusConsumer } from './kafka/statusConsumer.js';
 
 // ---- Routes ----
 import healthRoutes from './routes/health.js';
@@ -29,6 +30,7 @@ connectMongoTraveler()
   .then(async () => {
     console.log('🟢 Traveler Mongo connected BEFORE app middleware');
     await connectProducer();
+    await startStatusConsumer().catch(err => console.error("Kafka Status Consumer Error:", err));
   })
   .catch((err) => {
     console.error('🔴 Traveler Mongo failed to connect:', err);

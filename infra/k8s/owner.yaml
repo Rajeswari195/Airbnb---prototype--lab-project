@@ -24,7 +24,7 @@ spec:
         - name: MONGO_URI
           value: "mongodb://mongo-service:27017/airbnb"
         - name: BOOKING_TOPIC
-          value: "booking.status"
+          value: "booking-events"
         - name: KAFKA_BROKERS
           value: "kafka-service:9092"
 ---
