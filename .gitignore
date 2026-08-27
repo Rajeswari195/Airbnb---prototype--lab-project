@@ -38,3 +38,8 @@ results/
 # Temporary Scripts
 *_cookies.txt
 *_login.json
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+.env
